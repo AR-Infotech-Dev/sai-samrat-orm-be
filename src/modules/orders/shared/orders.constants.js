@@ -1,0 +1,2 @@
+export const DEFAULT_TICKET_PREFIX = "SSO";
+export const DEFAULT_TICKET_PADDING = 4;

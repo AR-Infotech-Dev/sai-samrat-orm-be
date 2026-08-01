@@ -1,0 +1,111 @@
+<div style="background:#f4f7fb;padding:30px 15px;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:700px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 25px rgba(0,0,0,0.08);">
+
+    <div style="background:#B91C1C;padding:30px;text-align:center;">
+      <h2 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;">
+        Product Expiry Alert
+      </h2>
+      <p style="margin:10px 0 0;color:#FEE2E2;font-size:15px;">
+        Your product subscription is nearing expiry.
+      </p>
+    </div>
+
+    <div style="padding:30px;">
+      <p style="margin:0 0 20px;font-size:16px;color:#172033;">
+        Dear {{customerName}},
+      </p>
+
+      <p style="margin:0 0 20px;line-height:1.7;color:#475569;">
+        This is a reminder that your product
+        <strong>{{product.product_name}}</strong>
+        is scheduled to expire on
+        <strong>{{product.expiry_date}}</strong>.
+      </p>
+
+      <div style="background:#f8fafc;border-left:5px solid #B91C1C;padding:5px;border-radius:10px;margin:20px 0;">
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+
+          <tr>
+            <td style="padding:12px;border:1px solid #e8eef6;background:#f8fbff;color:#64748b;font-weight:600;">
+              Customer Name
+            </td>
+            <td style="padding:12px;border:1px solid #e8eef6;">
+              {{customerName}}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:12px;border:1px solid #e8eef6;background:#f8fbff;color:#64748b;font-weight:600;">
+              Product
+            </td>
+            <td style="padding:12px;border:1px solid #e8eef6;">
+              {{product.product_name}}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:12px;border:1px solid #e8eef6;background:#f8fbff;color:#64748b;font-weight:600;">
+              Serial Number
+            </td>
+            <td style="padding:12px;border:1px solid #e8eef6;">
+              {{product.serial_number}}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:12px;border:1px solid #e8eef6;background:#f8fbff;color:#64748b;font-weight:600;">
+              Expiry Date
+            </td>
+            <td style="padding:12px;border:1px solid #e8eef6;color:#DC2626;font-weight:700;">
+              {{product.expiry_date}}
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:12px;border:1px solid #e8eef6;background:#f8fbff;color:#64748b;font-weight:600;">
+              Days Remaining
+            </td>
+            <td style="padding:12px;border:1px solid #e8eef6;">
+              {{product.days_left}} Days
+            </td>
+          </tr>
+
+          <tr>
+            <td style="padding:12px;border:1px solid #e8eef6;background:#f8fbff;color:#64748b;font-weight:600;">
+              Add-ons
+            </td>
+            <td style="padding:12px;border:1px solid #e8eef6;">
+              {{product.add_ons}}
+            </td>
+          </tr>
+
+        </table>
+      </div>
+
+      <div style="background:#FEF2F2;padding:16px;border-radius:10px;border:1px solid #FECACA;">
+        <strong style="color:#B91C1C;">
+          Action Required:
+        </strong>
+        <p style="margin:10px 0 0;color:#7F1D1D;line-height:1.6;">
+          Please renew your product before the expiry date to avoid interruption in support and services.
+        </p>
+      </div>
+
+      <p style="margin:25px 0 0;line-height:1.7;color:#475569;">
+        For renewal assistance, please contact our support team.
+      </p>
+
+      <p style="margin-top:30px;color:#172033;">
+        Regards,<br>
+        <strong>{{companyName}}</strong><br>
+      </p>
+    </div>
+
+    <div style="background:#f8fafc;padding:18px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="margin:0;font-size:13px;color:#64748b;">
+        This is an automated reminder from {{companyName}}.
+      </p>
+    </div>
+
+  </div>
+</div>

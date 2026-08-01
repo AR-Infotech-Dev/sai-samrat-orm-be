@@ -1,0 +1,33 @@
+<tr>
+  <td class="section-title-cell" colspan="{{sectionColspan}}">
+    {{leftTitle}}
+  </td>
+
+  {{{gapCells}}}
+
+  <td class="section-title-cell" colspan="{{sectionColspan}}">
+    {{rightTitle}}
+  </td>
+</tr>
+
+{{#each rows}}
+  <tr>
+    <td class="detail-label-cell" style="text-align: left;" colspan="{{../labelColspan}}">
+      {{leftLabel}}
+    </td>
+
+    <td class="detail-value-cell" style="text-align: left;" colspan="{{../valueColspan}}">
+      {{leftValue}}
+    </td>
+
+    {{{../gapCells}}}
+
+    <td class="detail-label-cell" style="text-align: left;" colspan="{{../labelColspan}}">
+      {{rightLabel}}
+    </td>
+
+    <td class="detail-value-cell" style="text-align: left;" colspan="{{../valueColspan}}">
+      {{rightValue}}
+    </td>
+  </tr>
+{{/each}}

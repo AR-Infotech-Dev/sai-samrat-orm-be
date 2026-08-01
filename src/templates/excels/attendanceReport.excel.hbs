@@ -1,0 +1,34 @@
+<tr>
+  <td class="top-title" colspan="{{spreadsheetColumnCount}}">{{reportTitle}}</td>
+</tr>
+{{{spacerRow}}}
+{{{summarySection}}}
+<tr>
+  <td class="top-title" colspan="{{spreadsheetColumnCount}}">Attendance Details</td>
+</tr>
+<tr>
+  <th class="ticket-header-cell">Sr No</th>
+  <th class="ticket-header-cell">Date</th>
+  <th class="ticket-header-cell">Sign In</th>
+  <th class="ticket-header-cell">Sign In Location</th>
+  <th class="ticket-header-cell">Sign Out</th>
+  <th class="ticket-header-cell">Sign Out Location</th>
+  <th class="ticket-header-cell">Work Duration</th>
+  <th class="ticket-header-cell">Status</th>
+</tr>
+{{#if hasRows}}
+{{#each rows}}
+<tr style="height:40px;">
+  <td class="ticket-cell">{{srNo}}</td>
+  <td class="ticket-cell">{{date}}</td>
+  <td class="ticket-cell">{{signIn}}</td>
+  <td class="ticket-cell">{{signInLocation}}</td>
+  <td class="ticket-cell">{{signOut}}</td>
+  <td class="ticket-cell">{{signOutLocation}}</td>
+  <td class="ticket-cell">{{workDuration}}</td>
+  <td class="ticket-cell">{{status}}</td>
+</tr>
+{{/each}}
+{{else}}
+<tr><td class="empty-ticket-cell" colspan="{{spreadsheetColumnCount}}">No attendance records found for this period.</td></tr>
+{{/if}}

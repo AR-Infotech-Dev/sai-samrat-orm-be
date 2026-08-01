@@ -1,0 +1,71 @@
+<div style="font-family:Arial,Helvetica,sans-serif;max-width:100%;margin:auto;overflow:hidden">
+  <div style="background:#198754;padding:20px;text-align:center;color:#fff">
+    <h2 style="margin:0;">{{subject}}</h2>
+  </div>
+
+  <div style="padding:25px 60px;
+    color:#333; 
+    padding: 25px 60px;
+    height: 530px;
+    ">
+    <p>Hello <strong>{{clientName}}</strong>,</p>
+    <p>{{message}}</p>
+
+    {{#if description}}
+    <div style="background:#f8f9fa;border-left:4px solid #198754;padding:12px 15px;margin:20px 0;border-radius:4px;">
+      <strong>Issue Description</strong>
+      <p style="margin:8px 0 0;">{{description}}</p>
+    </div>
+    {{/if}}
+    <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-top:15px;">
+      <tr>
+        <td style="padding:10px;border:1px solid #ddd;background:#f8f9fa;"><strong>Ticket No</strong></td>
+        <td style="padding:10px;border:1px solid #ddd;">{{ticketNo}}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #ddd;background:#f8f9fa;"><strong>Subject</strong></td>
+        <td style="padding:10px;border:1px solid #ddd;">{{subject}}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #ddd;background:#f8f9fa;"><strong>Query Type</strong></td>
+        <td style="padding:10px;border:1px solid #ddd;">{{category}}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #ddd;background:#f8f9fa;"><strong>Status</strong></td>
+        <td style="padding:10px;border:1px solid #ddd;">{{status}}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #ddd;background:#f8f9fa;"><strong>Priority</strong></td>
+        <td style="padding:10px;border:1px solid #ddd;">{{priority}}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #ddd;background:#f8f9fa;"><strong>Assigned To</strong></td>
+        <td style="padding:10px;border:1px solid #ddd;">{{assignedTo}}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #ddd;background:#f8f9fa;"><strong>Created Date</strong></td>
+        <td style="padding:10px;border:1px solid #ddd;">{{createdDate}}</td>
+      </tr>
+      <tr>
+        <td style="padding:10px;border:1px solid #ddd;background:#f8f9fa;"><strong>Due Date</strong></td>
+        <td style="padding:10px;border:1px solid #ddd;">{{dueDate}}</td>
+      </tr>
+    </table>
+
+    <p style="margin-top:25px;">Thank you for contacting us.</p>
+
+    {{#if redirectUrl}}
+    <p style="margin:14px 0;text-align:center;">
+      <a href="{{redirectUrl}}"
+        style="background:#0d6efd;color:#ffffff;text-decoration:none;padding:8px 18px;border-radius:6px;display:inline-block;font-weight:bold;">Submit
+        {{redirectUrlText}}</a>
+    </p>
+    {{/if}}
+
+    <p>Regards,<br /><strong>Support Team</strong><br />{companyName}</p>
+
+  </div>
+  <div style="background:#f8f9fa;padding:12px;text-align:center;font-size:12px;color:#666;">
+    This is an automated email. Please do not reply.
+  </div>
+</div>

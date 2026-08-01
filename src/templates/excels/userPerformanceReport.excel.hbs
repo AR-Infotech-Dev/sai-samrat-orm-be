@@ -1,0 +1,42 @@
+<tr>
+    <td class="top-title" colspan="{{spreadsheetColumnCount}}">
+        {{reportTitle}}
+    </td>
+</tr>
+{{{spacerRow}}}
+{{{summarySection}}}
+<tr>
+    <td class="top-title" colspan="{{spreadsheetColumnCount}}">
+        Ticket Details
+    </td>
+</tr>
+<tr>
+    <th class="ticket-header-cell">Sr No</th>
+    <th class="ticket-header-cell">Ticket Number</th>
+    <th class="ticket-header-cell">Customer Name</th>
+    <th class="ticket-header-cell">Priority</th>
+    <th class="ticket-header-cell">Ticket Status</th>
+    <th class="ticket-header-cell">Assigned Date</th>
+    <th class="ticket-header-cell">Due Date</th>
+    <th class="ticket-header-cell">Call Direction</th>
+    <th class="ticket-header-cell" colspan="1">Resolution Time</th>
+</tr>
+{{#if hasSupportRows}}
+{{#each supportRows}}
+<tr>
+    <td class="ticket-cell">{{srNo}}</td>
+    <td class="ticket-cell">{{ticket_no}}</td>
+    <td class="ticket-cell">{{customer_name}}</td>
+    <td class="ticket-cell">{{ticket_priority}}</td>
+    <td class="ticket-cell">{{ticket_status}}</td>
+    <td class="ticket-cell">{{assigned_date}}</td>
+    <td class="ticket-cell">{{due_date}}</td>
+    <td class="ticket-cell">{{call_direction}}</td>
+    <td class="ticket-cell">{{resolution_time}}</td>
+</tr>
+{{/each}}
+{{else}}
+<tr>
+    <td class="empty-ticket-cell" colspan="{{spreadsheetColumnCount}}"> No support calls found for this AMC period.</td>
+</tr>
+{{/if}}

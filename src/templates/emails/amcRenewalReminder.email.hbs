@@ -1,0 +1,53 @@
+<div style="background:#f4f7fb;padding:30px 15px;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:700px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 8px 25px rgba(0,0,0,0.08);">
+    <div style="background:#003b7d;padding:30px;text-align:center;">
+      <h2 style="margin:0;color:#ffffff;font-size:28px;font-weight:700;">AMC Renewal Reminder</h2>
+      <p style="margin:10px 0 0;color:#dbeafe;font-size:15px;">Your annual maintenance contract is nearing expiry.</p>
+    </div>
+
+    <div style="padding:30px;">
+      <div style="font-family:Arial,Helvetica,sans-serif;color:#172033;">
+        <p style="margin:0 0 20px;font-size:16px;">Dear {{customerName}},</p>
+
+        <p style="margin:0 0 20px;line-height:1.7;color:#475569;">
+          This is a friendly reminder that your AMC period from
+          <strong>{{amcStartDate}}</strong> to
+          <strong>{{amcEndDate}}</strong> is due for renewal.
+        </p>
+
+        <div style="background:#f8fafc;border-left:5px solid #003b7d;padding:5px;border-radius:10px;margin:20px 0;">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:collapse;">
+            <tr>
+              <td style="padding:12px;border:1px solid #e8eef6;background:#f8fbff;color:#64748b;font-weight:600;">Customer</td>
+              <td style="padding:12px;border:1px solid #e8eef6;">{{customerName}}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px;border:1px solid #e8eef6;background:#f8fbff;color:#64748b;font-weight:600;">AMC Expiry</td>
+              <td style="padding:12px;border:1px solid #e8eef6;">{{amcEndDate}}</td>
+            </tr>
+            <tr>
+              <td style="padding:12px;border:1px solid #e8eef6;background:#f8fbff;color:#64748b;font-weight:600;">Support Calls in AMC Period</td>
+              <td style="padding:12px;border:1px solid #e8eef6;">{{supportCallCount}}</td>
+            </tr>
+          </table>
+        </div>
+
+        <p style="margin:20px 0;line-height:1.7;color:#475569;">
+          Please contact us to renew your AMC and continue uninterrupted support.
+        </p>
+
+        <p style="margin-top:30px;color:#172033;">
+          Regards,<br>
+          <strong>Support Team</strong><br>
+          {companyName}
+        </p>
+      </div>
+    </div>
+
+    <div style="background:#f8fafc;padding:18px;text-align:center;border-top:1px solid #e2e8f0;">
+      <p style="margin:0;font-size:13px;color:#64748b;">
+        Thank you for choosing our services.
+      </p>
+    </div>
+  </div>
+</div>

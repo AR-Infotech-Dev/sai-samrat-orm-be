@@ -1,0 +1,14 @@
+Field	            Type	    Required	Meaning
+product_id	        int	        yes	        Internal product ID
+tally_item_id	    varchar	    no	        Tally item/master ID
+product_code	    varchar	    no	        Product/model code
+product_name	    varchar	    yes	        Product/model name
+brand	            varchar	    no	        Brand/series
+category_id	        int	        no	        Category reference
+unit	            varchar	    no	        Nos/Kg/etc
+standard_rate	    decimal	    no	        Latest Tally rate
+gst_rate	        decimal	    no	        GST percentage
+is_tally_synced	    enum	    yes	        yes/no
+last_tally_sync_at	datetime	no	        Last sync time
+company_id	        int	        yes	        Company reference
+status	            enum	    yes	        active/inactive/delete

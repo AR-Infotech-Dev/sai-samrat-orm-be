@@ -1,0 +1,110 @@
+<div style="background:#f4f7fb;padding:24px 0;font-family:Arial,sans-serif;color:#172033;">
+    <table width="100%">
+        <tr>
+            <td align="center">
+                <table width="680" style="max-width:94%;background:#fff;border:1px solid #e8eef6;border-radius:14px;">
+                    <tr>
+                        <td style="background:#003b7d;padding:28px;text-align:center;color:#fff;">
+                            <div style="font-size:24px;font-weight:700;">
+                                Customer Support Report
+                            </div>
+                            <div style="margin-top:8px;font-size:13px;color:#cbd5e1;">
+                                Service Summary & Support Activity
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:32px;">
+                            <p>
+                                Dear <strong>{{customerName}}</strong>,
+                            </p>
+                            <p style="color:#475569;">
+                                Please find below your support activity summary and service details.
+                            </p>
+                            <table width="100%" style="margin-bottom:24px;">
+                                <tr>
+                                    {{#each summaryCards}}
+                                    <td style="padding:0 5px;">
+                                        <div style="background:{{bg}};border-radius:12px;padding:16px;text-align:center;">
+                                            <div style="font-size:12px;color:#64748b;">
+                                                {{label}}
+                                            </div>
+                                            <div style="margin-top:6px;font-size:24px;font-weight:700;color:{{color}};">
+                                                {{value}}
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {{/each}}
+                                </tr>
+                            </table>
+
+                            {{#if isActiveAMC}}
+                            <div style="margin-bottom:24px;padding:20px;background:#ecfdf5;border:1px solid #d1fae5;border-radius:12px;">
+                                <div style="font-size:16px;font-weight:700;color:#166534;margin-bottom:14px;">
+                                    AMC Coverage Details
+                                </div>
+                                <table width="100%">
+                                    <tr>
+                                        <td>AMC Start Date</td>
+                                        <td><strong>{{amcStartDate}}</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>AMC Expiry Date</td>
+                                        <td><strong>{{amcEndDate}}</strong></td>
+                                    </tr>
+                                    <tr>
+                                        <td>Support Calls</td>
+                                        <td><strong>{{supportCallCount}}</strong></td>
+                                    </tr>
+                                </table>
+                            </div>
+                            {{/if}}
+                            <div>
+                                <div style="font-size:16px;font-weight:700;margin-bottom:14px;">
+                                    Supported Products
+                                </div>
+                                <table width="100%" style="border-collapse:collapse;">
+                                    <tr>
+                                        <th style="background:#003b7d;color:#fff;padding:12px;text-align:left;">
+                                            Product
+                                        </th>
+                                        <th style="background:#003b7d;color:#fff;padding:12px;text-align:left;">
+                                            Serial Number
+                                        </th>
+                                    </tr>
+                                    {{#if products.length}}
+                                    {{#each products}}
+                                    <tr>
+                                        <td style="padding:10px;border:1px solid #e8eef6;">
+                                            {{product_name}}
+                                        </td>
+                                        <td style="padding:10px;border:1px solid #e8eef6;">
+                                            {{serial_number}}
+                                        </td>
+                                    </tr>
+                                    {{/each}}
+                                    {{else}}
+                                    <tr>
+                                        <td colspan="2"
+                                            style="padding:14px;text-align:center;border:1px solid #e8eef6;">
+                                            No products found.
+                                        </td>
+                                    </tr>
+                                    {{/if}}
+                                </table>
+                            </div>
+                            <p style="margin-top:24px;">
+                                For any support assistance or service queries, feel free to contact our support team.
+                            </p>
+                            <p>
+                                Regards,<br />
+                                <strong>Support Team</strong><br />
+                                {{companyName}}
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</div>

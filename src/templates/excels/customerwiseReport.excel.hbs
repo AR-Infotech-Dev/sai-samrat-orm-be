@@ -1,0 +1,57 @@
+<tr>
+    <td class="top-title" colspan="{{spreadsheetColumnCount}}">
+        {{reportTitle}}
+    </td>
+</tr>
+{{{spacerRow}}}
+{{{summarySection}}}
+<tr>
+    <td class="top-title" colspan="{{spreadsheetColumnCount}}">
+        Ticket Details
+    </td>
+</tr>
+<tr>
+    <th class="ticket-header-cell">Sr No</th>
+    <th class="ticket-header-cell">Customer</th>
+    <th class="ticket-header-cell">Contact</th>
+    <th class="ticket-header-cell">Total</th>
+    <th class="ticket-header-cell">Open</th>
+    <th class="ticket-header-cell">In Progress</th>
+    <th class="ticket-header-cell">Closed</th>
+    <th class="ticket-header-cell">Overdue</th>
+    <th class="ticket-header-cell" colspan="1">Last Ticket</th>
+</tr>
+{{#if hasSupportRows}}
+{{#each supportRows}}
+<tr style="height:40px;">
+    <td class="ticket-cell" style="text-align: left;">{{srNo}}</td>
+    <td class="ticket-cell" style="text-align: left;">{{customer_name}}</td>
+    <td class="ticket-cell" style="text-align: left;">
+        <p>
+            {{contact_person}}
+            <br>
+            {{mobile_no}}
+        </p>
+    </td>
+    <td class="ticket-cell" style="text-align: center;">{{total_tickets}}</td>
+    <td class="ticket-cell" style="text-align: center;">{{open_tickets}}</td>
+    <td class="ticket-cell" style="text-align: center;">{{in_progress_tickets}}</td>
+    <td class="ticket-cell" style="text-align: center;">{{closed_tickets}}</td>
+    <td class="ticket-cell" style="text-align: center;">{{overdue_tickets}}</td>
+    <td class="ticket-cell" style="text-align: left;">
+        <p>
+            {{#if (eq last_ticket_no "-")}}
+            -
+            {{else}}
+            {{last_ticket_no}}<br>
+            {{last_ticket_status}} | {{last_ticket_date}}
+            {{/if}}
+        </p>
+    </td>
+</tr>
+{{/each}}
+{{else}}
+<tr>
+    <td class="empty-ticket-cell" colspan="{{spreadsheetColumnCount}}"> No support calls found for this period.</td>
+</tr>
+{{/if}}

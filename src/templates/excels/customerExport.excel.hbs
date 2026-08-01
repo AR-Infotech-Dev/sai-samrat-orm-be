@@ -1,0 +1,19 @@
+<tr>
+    <td class="top-title" colspan="{{spreadsheetColumnCount}}">
+        {{exportTitle}}
+    </td>
+</tr>
+{{{spacerRow}}}
+
+<tr>
+    {{#each headers}}
+    <th class="ticket-header-cell">{{header}}</th>
+    {{/each}}
+</tr>
+{{#each rows}}
+<tr>
+    {{#each ../headers}}
+        <td style="text-align: left;" class="ticket-cell">{{getValue .. key}}</td>
+    {{/each}}
+</tr>
+{{/each}}
