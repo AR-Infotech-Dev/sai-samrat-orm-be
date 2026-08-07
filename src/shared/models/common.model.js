@@ -3,6 +3,16 @@ import { query, DB_PREFIX } from "#config/database.js";
 // =====================================
 // LAST INSERT ID
 // =====================================
+const printSql = (sql, params) => {
+    let fullSql = sql;
+    params.forEach(param => {
+        const formattedParam = typeof param === 'string' ? `'${param.replace(/'/g, "''")}'` : param;
+        fullSql = fullSql.replace('?', formattedParam);
+    });
+    console.log('{');
+    console.log('Sql :', fullSql);
+    console.log('}');
+}
 export const getLastInsertedID = (result) => {
     return result?.insertId || 0;
 };
@@ -45,7 +55,7 @@ export const getMasterDetails = async (table = "", select = "*", where = {}) => 
     if (conditions.length) {
         sql += ` WHERE ${conditions.join(" AND ")}`;
     }
-    
+
     return await query(sql, values);
 };
 export const getSpecificDetails = async (table = "", select = "*", where = {}) => {
@@ -160,8 +170,7 @@ export const GetMasterListDetails = async ({ select = "*", table = "", where = [
         const safeStart = Number(start) || 0;
         sql += ` LIMIT ${safeLimit} OFFSET ${safeStart}`;
     }
-    // console.log(sql);
-    
+    printSql(sql, params)
     const rows = await query(sql, params);
     return rows;
 };
@@ -185,6 +194,8 @@ export const getFilteredCount = async ({ table = "", where = {}, join = [], othe
 // INSERT
 // =====================================
 export const saveMasterDetails = async ({ table = "", data = {} } = {}) => {
+    console.log({ table, data });
+
     const normalizedData = normalizeWriteData(data);
     const columns = Object.keys(normalizedData);
     const values = Object.values(normalizedData);

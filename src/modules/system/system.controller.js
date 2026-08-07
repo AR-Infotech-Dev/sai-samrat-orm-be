@@ -97,9 +97,11 @@ export const getFreeTextSearch = async (req, res) => {
       where.push(`t.status = ?`);
       values.push("active");
     }
-    if (!isSuperAdmin(req.user) && ['customer', 'admin'].includes(tableName)) {
-      where.push(`t.company_id = ${req.user.company_id} `);
-    }
+    // if (!isSuperAdmin(req.user) && ['customer', 'admin'].includes(tableName)) {
+    //   where.push(`t.company_id = ${req.user.company_id} `);
+    // }
+    // console.log("isCompanyWise : ",isCompanyWise);
+    
     if (!isSuperAdmin(req.user) && isCompanyWise === true) {
       where.push(`t.company_id = ${req.user.company_id} `);
     }

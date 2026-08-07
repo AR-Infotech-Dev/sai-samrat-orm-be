@@ -68,10 +68,8 @@ export const list = async (req, res) => {
       order = "DESC",
       filters = [],
     } = req.body;
-
     // const limit = 10;
     const limit = env.perPage;
-
     const currentPage = Number(page) || 1;
     const start = (currentPage - 1) * limit;
 
@@ -119,7 +117,6 @@ export const list = async (req, res) => {
       join,
       other,
     });
-
     return successResponse(res, {
       code: 1004,
       httpStatus: 200,

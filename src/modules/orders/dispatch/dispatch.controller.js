@@ -275,8 +275,8 @@ export const save = async (req, res) => {
       const readyItem = readyMap[row.order_item_id];
       if (!readyItem) return failureResponse(res, { code: 2004, httpStatus: 404, message: `Order item ${row.order_item_id} not found` });
       const dispatchQty = toNumber(row.dispatch_qty);
-      if (dispatchQty < 0) return failureResponse(res, { code: 2001, httpStatus: 400, message: `${readyItem.product_name}: Dispatch qty negative à¤…à¤¸à¥‚ à¤¶à¤•à¤¤ à¤¨à¤¾à¤¹à¥€.` });
-      if (dispatchQty > toNumber(readyItem.available_dispatch_qty)) return failureResponse(res, { code: 2001, httpStatus: 400, message: `${readyItem.product_name}: Dispatch qty available qty à¤ªà¥‡à¤•à¥à¤·à¤¾ à¤œà¤¾à¤¸à¥à¤¤ à¤†à¤¹à¥‡.` });
+      if (dispatchQty < 0) return failureResponse(res, { code: 2001, httpStatus: 400, message: `${readyItem.product_name}: Dispatch qty negative.` });
+      if (dispatchQty > toNumber(readyItem.available_dispatch_qty)) return failureResponse(res, { code: 2001, httpStatus: 400, message: `${readyItem.product_name}: Dispatch qty available qty .` });
       if (dispatchQty > 0) {
         totalDispatchQty += dispatchQty;
         dispatchItems.push({ readyItem, dispatchQty, remarks: row.remarks || null });
