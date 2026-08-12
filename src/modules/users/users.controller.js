@@ -10,7 +10,7 @@ import { env } from "#config/env.js";
 import { renderTemplate } from "#shared/utils/templateMaker.js";
 import { hashPassword, verifyPassword } from "#shared/utils/password.js";
 import { DB_PREFIX, query } from "#config/database.js";
-import { getUserCompanyId, isSuperAdminRole } from "#shared/utils/role.utils.js";
+import { isSuperAdminRole } from "#shared/utils/role.utils.js";
 
 const MODULE_TABLE = "admin";
 const USER_LOCATION_LOGS_TABLE = "user_location_logs";
@@ -183,14 +183,6 @@ const default_columns = {
     key2: "roleID",
     select: "",
   },
-  default_company: {
-    table: "company_master",
-    alias: "dc",
-    column: "company_name",
-    key2: "company_id",
-    select: "",
-  },
-
 };
 
 const custom_columns = {
@@ -218,7 +210,6 @@ export const list = async (req, res) => {
       getAll = "N",
       orderBy = "created_date",
       order = "DESC",
-      company_id = null,
       filters,
     } = req.body;
 
@@ -243,14 +234,6 @@ export const list = async (req, res) => {
     });
 
     const { select, where, values, join, other } = filterData;
-    const scopedCompanyId = isSuperAdminRole(req.user?.role_slug)
-      ? null
-      : getUserCompanyId(req.user);
-
-    if (scopedCompanyId) {
-      where.push("t.company_id = ?");
-      values.push(scopedCompanyId);
-    }
     // HIDE SUPER ADMIN FROM LIST
     where.push("r.slug != ?");
     values.push('super_admin');
@@ -317,23 +300,16 @@ export const list = async (req, res) => {
 };
 export const listNoAuth = async (req, res) => {
   try {
-    const { searchText = "", getAll = "N", orderBy = "created_date", order = "DESC", company_id = null, } = req.body;
+    const { searchText = "", getAll = "N", orderBy = "created_date", order = "DESC" } = req.body;
     const text = String(searchText).trim();
     const where = [];
     const values = [];
-    const list = 'name, adminID, company_id, email, roleID ';
-    const isCompanyWise = true;
+    const list = 'name, adminID, email, roleID ';
     const wherec = 'name'
    
     if (text) {
       where.push(`t.${wherec} LIKE ?`);
       values.push(`%${text}%`);
-    }
-    if (!isSuperAdminRole(req.user?.role_slug)) {
-      where.push(`t.company_id = ${req.user.company_id} `);
-    }
-    if (!isSuperAdminRole(req.user?.role_slug) && isCompanyWise === true) {
-      where.push(`t.company_id = ${req.user.company_id} `);
     }
     const result = await CommonModel.GetMasterListDetails({ select: list, table: MODULE_TABLE, where, values });
 
@@ -740,7 +716,6 @@ export const updateStatus = async (req, res) => {
 export const getMarkers = async (req, res) => {
   try {
     const { employee_id, user_id, adminID, from_date, showVisits, to_date } = req.body;
-    const company_id = req.user.company_id;
     const selectedEmployeeId = employee_id || user_id || adminID;
     const shouldShowVisits = showVisits === true || showVisits === "true" || showVisits === "y" || showVisits === 1 || showVisits === "1";
     const where = ["a.latitude IS NOT NULL", "a.longitude IS NOT NULL", "a.latitude != ''", "a.longitude != ''",];
@@ -749,13 +724,6 @@ export const getMarkers = async (req, res) => {
       // "v.status = 'active'",
     ];
     const visitValues = [];
-
-    if (company_id) {
-      where.push("a.company_id = ?");
-      values.push(company_id);
-      visitWhere.push("v.company_id = ?");
-      visitValues.push(company_id);
-    }
 
     if (selectedEmployeeId) {
       where.push("a.adminID = ?");

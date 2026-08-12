@@ -102,9 +102,6 @@ export const getFreeTextSearch = async (req, res) => {
     // }
     // console.log("isCompanyWise : ",isCompanyWise);
     
-    if (!isSuperAdmin(req.user) && isCompanyWise === true) {
-      where.push(`t.company_id = ${req.user.company_id} `);
-    }
     if (tableName === "categories") {
       where.push(`t.is_parent = 'yes' `);
     }
@@ -164,12 +161,6 @@ export const getFreeTextAssignee = async (req, res) => {
       where.push(`t.status = ?`);
       values.push("active");
     }
-    if (!isSuperAdmin(req.user) && ['customer', 'admin'].includes(tableName)) {
-      where.push(`t.company_id = ${req.user.company_id} `);
-    }
-    if (!isSuperAdmin(req.user) && isCompanyWise === true) {
-      where.push(`t.company_id = ${req.user.company_id} `);
-    }
     let sel = list.split(',')
       .map(item => `t.${item}`)
       .join(',');
@@ -177,8 +168,6 @@ export const getFreeTextAssignee = async (req, res) => {
     let select = sel;
 
     if (tableName === "admin") {
-      const companyId = Number(req.user.company_id || 0);
-      const ticketCompanyCondition = companyId ? ` AND pt.company_id = ${companyId}` : "";
       select = `${select}`;
       other.groupBy = "t.adminID";
     }
@@ -276,10 +265,6 @@ export const getslugList = async (req, res) => {
       "t.parent_id = ?",
       "t.status = ?",
     ];
-
-    if (!isSuperAdmin(req.user) && isCompanyWise === true) {
-      childW.push(`(t.company_id = ${req.user.company_id} OR t.is_sys_category = 'yes' )`);
-    }
 
     for (const row of categoryDetails) {
       const childV = [
