@@ -81,8 +81,6 @@ export const login = async (req, res) => {
     // ===============================
     // GENERATE TOKEN
     // ===============================
-    const companyId = user.company_id || user.default_company || null;
-    const company_name = user.company_name || null;
     const activeSessionId = createActiveSessionId();
     await setActiveSessionId(user.adminID, activeSessionId, isMobile);
 
@@ -92,8 +90,6 @@ export const login = async (req, res) => {
         username: user.userName,
         roleID: user.roleID,
         role_slug: user.role_slug,
-        company_id: companyId,
-        company_name: company_name,
         active_session_id: activeSessionId,
       },
       env.jwtSecret,
@@ -116,8 +112,6 @@ export const login = async (req, res) => {
             name: user.name,
             userName: user.userName,
             roleID: user.roleID,
-            company_id: companyId,
-            company_name: company_name,
             role_slug: user.role_slug,
           },
         },
@@ -140,8 +134,6 @@ export const login = async (req, res) => {
           name: user.name,
           userName: user.userName,
           roleID: user.roleID,
-          company_id: companyId,
-          company_name: company_name,
           role_slug: user.role_slug,
         },
       },
@@ -218,7 +210,7 @@ export const forgotPassword = async (req, res) => {
       subject: "Forgot Password OTP",
       html: template,
       text: `Your OTP is ${otp}. It will expire in 10 minutes.`,
-      company_id: user.company_id,
+      company_id: null,
     });
 
     if (!success) {
@@ -299,7 +291,7 @@ export const verifyForgotPassword = async (req, res) => {
       subject: "Password Updated Successfully",
       html: template,
       text: "Your password has been updated successfully.",
-      company_id: user.company_id,
+      company_id: null,
     });
 
     if (!success) {

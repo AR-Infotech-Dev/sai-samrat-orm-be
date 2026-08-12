@@ -118,9 +118,9 @@ const saveUserLocationLog = async ({ req, eventType }) => {
 const userSchema = Joi.object({
   adminID: Joi.number().integer().positive().allow(null),
   name: Joi.string().required(),
-  default_company: Joi.number().allow(null).default(null),
+  default_company: Joi.any().strip(),
   time_zone: Joi.string().allow("", null),
-  company_id: Joi.number().integer().allow(null),
+  company_id: Joi.any().strip(),
 
   is_approver: Joi.string().valid("yes", "no").default("no"),
   userName: Joi.string().required(),
@@ -419,7 +419,7 @@ export const getAdminDetails = async (req, res) => {
           subject: "User Login Credentials",
           html: template,
           text: "",
-          company_id: data.company_id || req.user.company_id,
+          company_id: null,
         });
         if (!success) {
           return failureResponse(res, {
@@ -823,8 +823,6 @@ export const getProfile = async (req, res) => {
         t.roleID,
         r.roleName AS roleName,
         r.slug AS role_slug,
-        t.company_id,
-        cm.company_name AS company_name,
         t.is_approver,
         t.google_location,
         t.status,
@@ -843,13 +841,6 @@ export const getProfile = async (req, res) => {
           alias: "r",
           key1: "roleID",
           key2: "roleID",
-        },
-        {
-          type: "LEFT JOIN",
-          table: "company_master",
-          alias: "cm",
-          key1: "company_id",
-          key2: "company_id",
         },
       ],
     });
