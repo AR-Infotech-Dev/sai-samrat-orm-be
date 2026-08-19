@@ -130,7 +130,8 @@ export const list = async (req, res) => {
     where.push("t.status <> 'delete'");
     other.freeTextSearch = searchText;
     other.searchColumns = ["t.order_no", "t.brand", "cu.name"];
-
+    console.log(join);
+    
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.push("t.company_id = ?");
     //   values.push(req.user.company_id);
@@ -293,6 +294,121 @@ export const getOrderDetails = async (req, res) => {
     });
   }
 };
+
+// **********************************************************
+
+export const preview = async (req, res) => {
+  try {
+    const { id: order_id } = req.params;
+
+    if (!order_id) {
+      return failureResponse(res, {
+        code: 2004,
+        httpStatus: 404,
+        message: "Order ID is required",
+      });
+    }
+
+    // =========================
+    // ORDER + COMPANY
+    // =========================
+    const preview = {
+      orderDetails: {}
+    };
+    preview['orderDetails'] = await CommonModel.getMasterDetails('orders', '*', { order_id });
+
+    if (!preview['orderDetails'].length) {
+      return failureResponse(res, {
+        code: 2004,
+        httpStatus: 404,
+        message: "Order not found",
+      });
+    }
+
+
+const customerId = preview.orderDetails[0].customer_id;
+
+if (customerId) {
+  const customerDetails = await query(
+    `
+      SELECT
+        customer_id,
+        name,
+        mobile_no,
+        email
+      FROM ${DB_PREFIX}customer
+      WHERE customer_id = ?
+      LIMIT 1
+    `,
+    [customerId]
+  );
+
+  if (customerDetails.length) {
+    preview.orderDetails[0].customer_name = customerDetails[0].name;
+    preview.orderDetails[0].customer_mobile = customerDetails[0].mobile_no;
+    preview.orderDetails[0].customer_email = customerDetails[0].email;
+  }
+}
+
+
+    // =========================
+    // ORDER ITEMS
+    // =========================
+
+    const items = await query(
+      `
+        SELECT
+          oi.*,
+          p.product_code,
+          p.product_name,
+          p.brand,
+          p.standard_rate,
+          p.gst_rate,
+          p.weight
+
+        FROM ${DB_PREFIX}order_items oi
+
+        LEFT JOIN ${DB_PREFIX}products p
+          ON oi.product_id = p.product_id
+
+        WHERE oi.order_id = ?
+          AND oi.status <> 'delete'
+
+        ORDER BY oi.order_item_id ASC
+      `,
+      [order_id]
+    );
+
+    // =========================
+    // RESPONSE
+    // =========================
+
+    return successResponse(res, {
+      code: 1004,
+      httpStatus: 200,
+      data: {
+        data: {
+          ...preview,
+          items,
+        },
+      },
+       
+    });
+
+  } catch (error) {
+    console.error("Preview Order Error:", error);
+
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message,
+    });
+  }
+};
+
+
+
+// *********************************************************
 
 export const changeStatus = async (req, res) => {
   try {
