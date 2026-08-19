@@ -119,12 +119,6 @@ export const list = async (req, res) => {
     other.freeTextSearch = searchText;
     other.searchColumns = CUSTOMER_SEARCH_COLUMNS;
 
-    // FILTER DATA ACCORDING TO COMPANY ID
-    if (!isSuperAdmin(req.user) && req.user.company_id) {
-      where.push("t.company_id = ?");
-      values.push(req.user.company_id);
-    }
-
     const total = await CommonModel.getCountsByParameter({ table: MODULE_TABLE, where, values, join, other, });
     const totalPages = Math.ceil(total / limit);
     const end = Math.min(start + limit, total);
@@ -196,7 +190,7 @@ export const getCustomerDetails = async (req, res) => {
         delete data.contact_persons;
         data.customer_products = JSON.stringify(customerProducts);
         data.created_by = req.user.adminID;
-        data.company_id = req.user.company_id;
+        data.company_id = data.company_id || null;
         data.created_date = toMysqlDateTime();
         
         console.log('3');
@@ -587,12 +581,6 @@ export const downloadExcel = async (req, res) => {
     const { select, where, values, join, other } = filterData;
     other.freeTextSearch = searchText;
     other.searchColumns = CUSTOMER_SEARCH_COLUMNS;
-
-    // FILTER DATA ACCORDING TO COMPANY ID
-    if (!isSuperAdmin(req.user) && req.user.company_id) {
-      where.push("t.company_id = ?");
-      values.push(req.user.company_id);
-    }
 
     const customerDetails = await CommonModel.GetMasterListDetails({ select: `${select}, t.company_id AS source_company_id`, table: MODULE_TABLE, where, values, join, other, });
     const exportColumns = Array.isArray(selectedColumns) && selectedColumns.length ? selectedColumns : visibleColumns;

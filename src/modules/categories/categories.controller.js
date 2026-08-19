@@ -62,11 +62,6 @@ export const getcategoryDetails = async (req, res) => {
         other.searchColumns = ["t.categoryName", "t.slug", "t.description"];
         // console.log(other);
 
-        if (!isSuperAdmin(req.user) && req.user.company_id) {
-            where.push("t.company_id = ?");
-            values.push(req.user.company_id);
-        }
-
         if (category_id) {
             addInFilter(where, values, "t.category_id", category_id);
         }
@@ -202,7 +197,7 @@ export const categoryMaster = async (req, res) => {
                 const data = await buildTablePayload(MODULE_TABLE, {
                     ...payload,
                     status: req.body.status || "active",
-                    company_id: req.user.company_id || null,
+                    company_id: null,
                     created_by: req.user.adminID,
                     created_date: toMysqlDateTime(),
                 });
@@ -331,9 +326,6 @@ export const changeStatus = async (req, res) => {
         }
 
         const where = { category_id: ids };
-        if (!isSuperAdmin(req.user) && req.user.company_id) {
-            where.company_id = req.user.company_id;
-        }
         where.is_sys_category = 'no';
         await CommonModel.deleteMasterDetails({
             table: MODULE_TABLE,

@@ -11,7 +11,6 @@ const MODULE_TABLE = "module_access";
 const menuValidationRules = {
   user_id: { label: "User Id", required: true },
   permissions: { label: "Permissions", required: true },
-  company_id: { label: "Company ID", required: true },
 };
 
 // =============================================
@@ -91,13 +90,11 @@ export const saveModulesAccess = async (req, res) => {
 
     const existingRows = await CommonModel.getMasterDetails(MODULE_TABLE, "*", {
       user_id: data.user_id,
-      company_id: data.company_id,
     });
 
     if (!existingRows.length) {
       const createData = {
         user_id: data.user_id,
-        company_id: data.company_id,
         permissions: data.permissions,
         created_by: req.user.adminID,
         created_date: toMysqlDateTime(),

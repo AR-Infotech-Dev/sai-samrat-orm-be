@@ -56,9 +56,7 @@ const getMenuIdByModuleKey = async (moduleKey) => {
   return menuId;
 };
 
-const getUserModuleAccess = async (user_id, company_id) => {
-  // const sql = `SELECT permissions FROM ${DB_PREFIX}module_access WHERE user_id = ? AND company_id = ? AND status = 'active' LIMIT 1 `;
-  // const rows = await query(sql, [user_id, company_id]);
+const getUserModuleAccess = async (user_id) => {
   const sql = `SELECT permissions FROM ${DB_PREFIX}module_access WHERE user_id = ? AND status = 'active' LIMIT 1 `;
   const rows = await query(sql, [user_id]);
   return rows[0] || null;
@@ -72,9 +70,7 @@ export const requirePermission = (moduleKey, action) => {
       }
 
       const user_id = req.user?.adminID;
-      const company_id = req.user?.company_id;
-
-      if (!user_id || !company_id) {
+      if (!user_id) {
         return failureResponse(res, {
           code: 2007,
           httpStatus: 403,
@@ -82,7 +78,7 @@ export const requirePermission = (moduleKey, action) => {
         });
       }
 
-      const accessRow = await getUserModuleAccess(user_id, company_id);
+      const accessRow = await getUserModuleAccess(user_id);
       const permissions = parsePermissions(accessRow?.permissions);
       const menuId = await getMenuIdByModuleKey(moduleKey);
       

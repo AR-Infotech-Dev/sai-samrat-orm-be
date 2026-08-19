@@ -1,6 +1,6 @@
 import * as CommonModel from "#shared/models/common.model.js";
 import { query, DB_PREFIX } from "#config/database.js";
-import { canViewAllByRole, getUserCompanyId, isAdminRole } from "#shared/utils/role.utils.js";
+import { isAdminRole } from "#shared/utils/role.utils.js";
 
 const ORDER_TABLE = "orders";
 const ORDER_ITEMS_TABLE = "order_items";
@@ -52,15 +52,7 @@ const getFilterValue = (filter = {}, ...keys) => {
 };
 
 
-const addCompanyScope = (where, params, user = {}, alias = "o") => {
-  return;
-  if (canViewAllByRole(user)) return;
-  const companyId = getUserCompanyId(user);
-  if (companyId) {
-    where.push(`${alias}.company_id = ?`);
-    params.push(companyId);
-  }
-};
+const addCompanyScope = () => {};
 
 const addOrderDateScope = (where, params, filter = {}, alias = "o") => {
   const { fromDate, toDate } = getDateFilter(filter);

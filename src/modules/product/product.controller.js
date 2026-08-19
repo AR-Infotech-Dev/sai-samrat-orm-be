@@ -285,9 +285,6 @@ export const changeStatus = async (req, res) => {
     }
 
     const where = { product_id: ids };
-    if (!isSuperAdmin(req.user) && req.user.company_id) {
-      where.company_id = req.user.company_id;
-    }
 
     await CommonModel.deleteMasterDetails({
       table: MODULE_TABLE,

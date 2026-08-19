@@ -7,10 +7,9 @@ import { query, DB_PREFIX } from "#config/database.js";
 // ===================================
 export const verifyUserDetails = async (userName) => {
   const sql = `
-    SELECT t.*, r.slug AS role_slug, cmp.company_name as company_name 
+    SELECT t.*, r.slug AS role_slug
     FROM ${DB_PREFIX}admin AS t
     LEFT JOIN ${DB_PREFIX}user_role_master as r ON t.roleID = r.roleID
-    LEFT JOIN ${DB_PREFIX}company_master as cmp ON t.company_id = cmp.company_id
     WHERE (
       t.email = ?
       OR t.userName = ?
