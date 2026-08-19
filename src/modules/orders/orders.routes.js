@@ -38,6 +38,7 @@ ordersRoutes.get("/ready-stock/order/:orderId", requirePermission(["ready-stock"
 ordersRoutes.post("/", requirePermission(["order-booking"], "view"), bookingController.list);
 ordersRoutes.post("/delete", requirePermission(["order-booking"], "delete"), bookingController.changeStatus);
 ordersRoutes.put("/create", requirePermission(["order-booking"], "create"), bookingController.getOrderDetails);
+ordersRoutes.get("/:id/preview",requirePermission(["order-booking"], "view"),bookingController.preview);
 ordersRoutes.get("/:id", requirePermission(["order-booking"], "view"), bookingController.getOrderDetails);
 ordersRoutes.post("/:id", requirePermission(["order-booking"], "edit"), bookingController.getOrderDetails);
 
