@@ -63,6 +63,7 @@ export const normalizePayload = (body = {}, user = {}) => {
       const qty = toNumber(item.order_qty ?? item.qty);
       const rate = toNumber(item.unit_rate ?? item.unitRate);
       const gst = toNumber(item.gst_rate ?? item.gst);
+      const weight = toNumber(item.weight ?? item.weight);
       const taxableValue = qty * rate;
       const lineValue = toNumber(item.line_value, taxableValue + taxableValue * (gst / 100));
       const productId = toNumber(item.product_id ?? item.id, 0);
@@ -73,6 +74,7 @@ export const normalizePayload = (body = {}, user = {}) => {
         product_name_snapshot: firstValidString(item.product_name_snapshot, item.product, item.product_name, item.name),
         brand_snapshot: firstValidString(item.brand_snapshot, item.model, item.series, item.brand),
         order_qty: qty,
+        weight: weight,     
         unit_rate: rate,
         line_value: lineValue,
         item_status: normalizeEnum(item.item_status, ["active", "hold", "cancelled", "completed"], "active"),

@@ -9,6 +9,9 @@ import { normalizePayload, validateOrderPayload } from "../shared/order.helper.j
 
 const MODULE_TABLE = "orders";
 const ORDERS_LINE_TABLE = "order_items";
+
+const DEFAULT_COMPANY_ID = 1;
+
 const default_columns = {};
 const custom_columns = {
   customer_id: {
@@ -131,7 +134,7 @@ export const list = async (req, res) => {
     other.freeTextSearch = searchText;
     other.searchColumns = ["t.order_no", "t.brand", "cu.name"];
     console.log(join);
-    
+
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.push("t.company_id = ?");
     //   values.push(req.user.company_id);
@@ -192,10 +195,16 @@ export const getOrderDetails = async (req, res) => {
     switch (method) {
       case "PUT": {
         const { order, items } = normalizePayload(req.body, req.user);
+        order.company_id = DEFAULT_COMPANY_ID;
+        console.log("CREATE ORDER COMPANY ID:", order.company_id);
+
+
         const payloadError = validateOrderPayload(order, items);
+
         if (payloadError) {
           return failureResponse(res, { code: 2001, httpStatus: 400, message: payloadError });
         }
+
 
         const data = { ...order };
         delete data.order_id;
@@ -219,6 +228,7 @@ export const getOrderDetails = async (req, res) => {
         }
 
         const { order, items } = normalizePayload(req.body, req.user);
+        order.company_id = DEFAULT_COMPANY_ID;
         const payloadError = validateOrderPayload(order, items);
         if (payloadError) {
           return failureResponse(res, { code: 2001, httpStatus: 400, message: payloadError });
@@ -294,13 +304,9 @@ export const getOrderDetails = async (req, res) => {
     });
   }
 };
-
-// **********************************************************
-
 export const preview = async (req, res) => {
   try {
     const { id: order_id } = req.params;
-
     if (!order_id) {
       return failureResponse(res, {
         code: 2004,
@@ -308,93 +314,106 @@ export const preview = async (req, res) => {
         message: "Order ID is required",
       });
     }
-
-    // =========================
-    // ORDER + COMPANY
-    // =========================
-    const preview = {
-      orderDetails: {}
-    };
-    preview['orderDetails'] = await CommonModel.getMasterDetails('orders', '*', { order_id });
-
-    if (!preview['orderDetails'].length) {
+    const orderDetails = await CommonModel.getMasterDetails("orders", "*", { order_id });
+    if (!orderDetails.length) {
       return failureResponse(res, {
         code: 2004,
         httpStatus: 404,
         message: "Order not found",
       });
     }
-
-
-const customerId = preview.orderDetails[0].customer_id;
-
-if (customerId) {
-  const customerDetails = await query(
-    `
-      SELECT
-        customer_id,
-        name,
-        mobile_no,
-        email
-      FROM ${DB_PREFIX}customer
-      WHERE customer_id = ?
-      LIMIT 1
-    `,
-    [customerId]
-  );
-
-  if (customerDetails.length) {
-    preview.orderDetails[0].customer_name = customerDetails[0].name;
-    preview.orderDetails[0].customer_mobile = customerDetails[0].mobile_no;
-    preview.orderDetails[0].customer_email = customerDetails[0].email;
-  }
-}
-
-
-    // =========================
-    // ORDER ITEMS
-    // =========================
-
+    const order = orderDetails[0];
     const items = await query(
       `
-        SELECT
-          oi.*,
-          p.product_code,
-          p.product_name,
-          p.brand,
-          p.standard_rate,
-          p.gst_rate,
-          p.weight
+      SELECT
+        oi.order_item_id,
+        oi.company_id,
+        oi.order_id,
+        oi.product_id,
 
-        FROM ${DB_PREFIX}order_items oi
+        oi.product_code_snapshot,
+        oi.product_name_snapshot,
+        oi.brand_snapshot,
 
-        LEFT JOIN ${DB_PREFIX}products p
-          ON oi.product_id = p.product_id
+        oi.order_qty,
+        oi.unit_rate,
+        oi.weight as weight,
+        oi.line_value,
 
-        WHERE oi.order_id = ?
-          AND oi.status <> 'delete'
+        oi.expected_delivery_date,
+        oi.remarks AS item_remarks,
 
-        ORDER BY oi.order_item_id ASC
+        p.product_code,
+        p.product_name,
+        p.brand AS product_brand,
+        p.standard_rate,
+        p.gst_rate,
+        p.unit,
+        p.product_description,
+        p.product_type
+
+      FROM ${DB_PREFIX}order_items oi
+
+      LEFT JOIN ${DB_PREFIX}products p
+        ON oi.product_id = p.product_id
+        AND oi.company_id = p.company_id
+
+      WHERE oi.order_id = ?
+        AND oi.status <> 'delete'
+
+      ORDER BY oi.order_item_id ASC
       `,
       [order_id]
     );
+    const companyDetails = await CommonModel.getMasterDetails("company_master", "*", { company_id: 1 });
+    let customerDetails = null;
+    if (order.customer_id) {
+      customerDetails = await CommonModel.getMasterDetails("customer", "*", { customer_id: order.customer_id });
+    }
+    const invoiceValueTotal = items.reduce(
+      (total, item) => total + Number(item.line_value || 0),
+      0
+    );
 
     // =========================
-    // RESPONSE
+    // 6. CALCULATE TOTAL WEIGHT
     // =========================
-
+    const totalConsignmentWeight = items.reduce(
+      (total, item) => { const qty = Number(item.order_qty || 0); const weight = Number(item.weight || 0); return total + qty * weight; },
+      0
+    );
+    // =========================
+    // 7. PREPARE PREVIEW DATA
+    // =========================
+    const preview = {
+      orderDetails: {
+        ...order,
+        customer_name: customerDetails[0]?.name || null,
+        customer_mobile: customerDetails[0]?.mobile_no || null,
+        customer_email: customerDetails[0]?.email || null,
+      },
+      items,
+      companyDetails : companyDetails[0],
+      customerDetails : customerDetails[0],
+      summary: {
+        numberOfContainers: null,
+        insurance: null,
+        freight: "at actual",
+        advanceReceived: null,
+        totalQty: Number(order.total_order_qty || 0),
+        totalConsignmentWeight,
+        invoiceValueTotal,
+        currency: order.currency || "USD",
+        totalPIValue: invoiceValueTotal,
+      },
+    };
     return successResponse(res, {
       code: 1004,
       httpStatus: 200,
       data: {
-        data: {
-          ...preview,
-          items,
-        },
+        data: preview,
       },
-       
     });
-
   } catch (error) {
     console.error("Preview Order Error:", error);
 
@@ -405,11 +424,6 @@ if (customerId) {
     });
   }
 };
-
-
-
-// *********************************************************
-
 export const changeStatus = async (req, res) => {
   try {
     const { action = "", ids = [] } = req.body;
@@ -464,10 +478,3 @@ export const changeStatus = async (req, res) => {
     });
   }
 };
-
-
-
-
-
-
-
