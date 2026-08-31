@@ -634,9 +634,168 @@ const getDispatchDue = async (user, filter, tables) => {
   }));
 };
 
+const getLifecycleStageFilter = (filter = {}) => {
+  const rawStage = getFilterValue(filter, "stage", "activeTab", "tab") || "all";
+  const stage = String(rawStage || "all").toLowerCase().replace(/\s+/g, "_").replace(/-/g, "_");
+  return stage || "all";
+};
+
+const getLifecycleBase = async (user, filter, tables) => {
+  const { params, sql } = getOrderScope(user, filter);
+  const { planningJoin, productionJoin, dispatchJoin } = getJoinSql(tables);
+  const expr = getExpressions(tables);
+  const productionStatusExpr = tables.production ? "COALESCE(pr.production_status, '')" : "''";
+  const planningStatusExpr = tables.planning ? "COALESCE(pl.planning_status, '')" : "''";
+  const plannedQtyExpr = tables.planning ? "COALESCE(pl.planned_qty, COALESCE(pl.saipl_qty, 0) + COALESCE(pl.pmk_qty, 0) + COALESCE(pl.ready_qty, 0), 0)" : "0";
+  const expectedReadyDateExpr = tables.production && tables.planning ? "COALESCE(pr.expected_ready_date, pl.expected_ready_date)" : tables.production ? "pr.expected_ready_date" : tables.planning ? "pl.expected_ready_date" : "NULL";
+  const exchangeRateExpr = "COALESCE(NULLIF(o.exchange_rate, 0), 1)";
+  const lineValueBaseInrExpr = `CASE
+              WHEN UPPER(COALESCE(o.currency, 'INR')) IN ('INR', '₹') THEN COALESCE(oi.line_value, 0)
+              ELSE COALESCE(oi.line_value, 0) / ${exchangeRateExpr}
+            END`;
+
+  const rows = await safeQuery(
+    `SELECT o.order_id, o.order_no, o.order_date, o.expected_delivery_date, o.order_status, o.priority,
+            COALESCE(o.currency, 'INR') AS currency,
+            ${exchangeRateExpr} AS exchange_rate,
+            COALESCE(c.name, '-') AS customer_name,
+            oi.order_item_id, oi.product_id,
+            COALESCE(NULLIF(oi.product_name_snapshot, ''), p.product_name, '-') AS product_name,
+            COALESCE(NULLIF(oi.product_code_snapshot, ''), p.product_code, '') AS product_code,
+            COALESCE(NULLIF(oi.brand_snapshot, ''), NULLIF(p.brand, ''), NULLIF(o.brand, ''), '-') AS model,
+            COALESCE(p.weight, 0) AS weight,
+            COALESCE(oi.order_qty, 0) AS order_qty,
+            COALESCE(oi.unit_rate, 0) AS unit_rate,
+            COALESCE(oi.line_value, 0) AS line_value,
+            ${lineValueBaseInrExpr} AS line_value_base_inr,
+            ${plannedQtyExpr} AS planned_qty,
+            ${expr.saipl} AS saipl_qty,
+            ${expr.pmk} AS pmk_qty,
+            ${expr.produced} AS produced_qty,
+            ${tables.production ? "COALESCE(pr.qc_passed_qty, 0)" : "0"} AS qc_passed_qty,
+            ${tables.production ? "COALESCE(pr.rework_qty, 0)" : "0"} AS rework_qty,
+            ${tables.production ? "COALESCE(pr.procured_qty, 0)" : "0"} AS procured_qty,
+            ${expr.ready} AS ready_qty,
+            ${expr.dispatched} AS dispatched_qty,
+            GREATEST(COALESCE(oi.order_qty, 0) - ${expr.dispatched}, 0) AS balance_qty,
+            GREATEST(COALESCE(oi.order_qty, 0) - ${expr.ready}, 0) AS pending_qty,
+            GREATEST(${expr.ready} - ${expr.dispatched}, 0) AS ready_pending_dispatch_qty,
+            ${planningStatusExpr} AS planning_status,
+            ${productionStatusExpr} AS production_status,
+            ${expectedReadyDateExpr} AS expected_ready_date
+     FROM ${DB_PREFIX}${ORDER_TABLE} o
+     LEFT JOIN ${DB_PREFIX}customer c ON o.customer_id = c.customer_id
+     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
+     ${planningJoin}
+     ${productionJoin}
+     ${dispatchJoin}
+     ${sql}
+     ORDER BY COALESCE(o.expected_delivery_date, o.order_date) ASC, o.order_id DESC, oi.order_item_id ASC
+     LIMIT 300`,
+    params
+  );
+
+  return rows.map((row) => {
+    const readyQty = toNumber(row.ready_qty);
+    const dispatchedQty = toNumber(row.dispatched_qty);
+    const orderQty = toNumber(row.order_qty);
+    const baseStage = String(row.order_status || "draft").toLowerCase().replace(/-/g, "_");
+    const currentStage = dispatchedQty >= orderQty && orderQty > 0
+      ? "dispatch"
+      : dispatchedQty > 0
+        ? "partial_dispatch"
+        : readyQty >= orderQty && orderQty > 0
+          ? "ready_stock"
+          : baseStage;
+
+    return {
+      ...row,
+      current_stage: currentStage,
+      order_qty: roundQty(row.order_qty),
+      planned_qty: roundQty(row.planned_qty),
+      saipl_qty: roundQty(row.saipl_qty),
+      pmk_qty: roundQty(row.pmk_qty),
+      produced_qty: roundQty(row.produced_qty),
+      qc_passed_qty: roundQty(row.qc_passed_qty),
+      rework_qty: roundQty(row.rework_qty),
+      procured_qty: roundQty(row.procured_qty),
+      ready_qty: roundQty(row.ready_qty),
+      dispatched_qty: roundQty(row.dispatched_qty),
+      pending_qty: roundQty(row.pending_qty),
+      ready_pending_dispatch_qty: roundQty(row.ready_pending_dispatch_qty),
+      selected_currency: row.currency,
+      exchange_rate: toNumber(row.exchange_rate, 1),
+      selected_line_value: roundQty(row.line_value),
+      line_value: roundQty(row.line_value_base_inr),
+    };
+  });
+};
+
+const getLifecycleDashboard = async (user, filter, tables) => {
+  const selectedStage = getLifecycleStageFilter(filter);
+  const baseFilter = { ...filter, stage: "", activeTab: "", tab: "", order_status: "", status: "" };
+  const rows = await getLifecycleBase(user, baseFilter, tables);
+  const isPlanningStatus = (row, statuses) => statuses.includes(String(row.planning_status || "").toLowerCase().replace(/-/g, "_"));
+  const isDispatchedRow = (row) => toNumber(row.dispatched_qty) > 0 || ["dispatch", "completed"].includes(row.current_stage);
+  const isReadyRow = (row) => !isDispatchedRow(row) && (row.current_stage === "ready_stock" || row.current_stage === "ready");
+  const isProductionRow = (row) => !isDispatchedRow(row) && !isReadyRow(row) && (["planned", "production"].includes(row.current_stage) || Boolean(row.production_status));
+  const isPlanningRow = (row) => !isDispatchedRow(row) && !isReadyRow(row) && !isProductionRow(row) && (["confirmed", "planning", "planned"].includes(row.current_stage) || isPlanningStatus(row, ["not_planned", "partial_planned", "planned"]));
+
+  const matchesStage = (row) => {
+    if (selectedStage === "all") return true;
+    if (selectedStage === "confirmation") return ["waiting", "hold"].includes(row.current_stage);
+    if (selectedStage === "planning") return isPlanningRow(row);
+    if (selectedStage === "production") return isProductionRow(row);
+    if (selectedStage === "ready_stock") return isReadyRow(row);
+    if (selectedStage === "dispatch") return isDispatchedRow(row);
+    return row.current_stage === selectedStage;
+  };
+
+  const stageRows = {
+    all: rows,
+    confirmation: rows.filter((row) => ["waiting", "hold"].includes(row.current_stage)),
+    planning: rows.filter(isPlanningRow),
+    production: rows.filter(isProductionRow),
+    ready_stock: rows.filter(isReadyRow),
+    dispatch: rows.filter(isDispatchedRow),
+  };
+
+  const filteredRows = rows.filter(matchesStage);
+  const sum = (key, sourceRows = filteredRows) => roundQty(sourceRows.reduce((total, row) => total + toNumber(row[key]), 0));
+  const countOrders = (sourceRows) => new Set(sourceRows.map((row) => row.order_id).filter(Boolean)).size;
+  const tab = (key, label, sourceRows) => ({ key, label, count: countOrders(sourceRows), qty: sum("order_qty", sourceRows) });
+
+  return {
+    activeTab: selectedStage,
+    tabs: [
+      tab("all", "All", stageRows.all),
+      tab("confirmation", "Confirmation", stageRows.confirmation),
+      tab("planning", "Planning", stageRows.planning),
+      tab("production", "Production", stageRows.production),
+      tab("ready_stock", "Ready Stock", stageRows.ready_stock),
+      tab("dispatch", "Dispatch", stageRows.dispatch),
+    ],
+    summary: {
+      total_orders: countOrders(rows),
+      total_order_qty: sum("order_qty", rows),
+      total_value: sum("line_value", rows),
+      planned_qty: sum("planned_qty", rows),
+      produced_qty: sum("produced_qty", rows),
+      ready_qty: sum("ready_qty", rows),
+      dispatched_qty: sum("dispatched_qty", rows),
+      pending_qty: sum("pending_qty", rows),
+      ready_pending_dispatch_qty: sum("ready_pending_dispatch_qty", rows),
+      pmk_qty: sum("pmk_qty", rows),
+      saipl_qty: sum("saipl_qty", rows),
+    },
+    rows: filteredRows.slice(0, 80),
+  };
+};
+
 export const getDashboardOverview = async (user = {}, filter = {}) => {
   const tables = await getAvailableTables();
-  const [summary, pipeline, seriesMix, monthlyOrders, alerts, recentOrders, topProducts, actionKpis, bottleneckBoard, productLoad, criticalAlerts, productionReadyTrend, pmkPending, dispatchDue] = await Promise.all([
+  const [summary, pipeline, seriesMix, monthlyOrders, alerts, recentOrders, topProducts, actionKpis, bottleneckBoard, productLoad, criticalAlerts, productionReadyTrend, pmkPending, dispatchDue, lifecycle] = await Promise.all([
     getSummary(user, filter, tables),
     getPipeline(user, filter, tables),
     getSeriesMix(user, filter),
@@ -651,6 +810,7 @@ export const getDashboardOverview = async (user = {}, filter = {}) => {
     getProductionReadyTrend(user, filter),
     getPmkPending(user, filter),
     getDispatchDue(user, filter, tables),
+    getLifecycleDashboard(user, filter, tables),
   ]);
 
   return {
@@ -671,6 +831,7 @@ export const getDashboardOverview = async (user = {}, filter = {}) => {
     productionReadyTrend,
     pmkPending,
     dispatchDue,
+    lifecycle,
     meta: {
       usesPlanningTable: tables.planning,
       usesProductionTable: tables.production,
@@ -679,3 +840,7 @@ export const getDashboardOverview = async (user = {}, filter = {}) => {
     },
   };
 };
+
+
+
+

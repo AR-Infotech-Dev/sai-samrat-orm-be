@@ -39,13 +39,6 @@ const custom_columns = {
     key2: "company_id",
     select: "",
   },
-  sales_person_id: {
-    table: "admin",
-    alias: "sp",
-    column: "name",
-    key2: "adminID",
-    select: "",
-  },
   created_by: {
     table: "admin",
     alias: "ad",
@@ -73,7 +66,6 @@ export const orderValidationRules = {
   order_date: { label: "Order Date", required: true },
   order_month: { label: "Order Month" },
   order_week: { label: "Order Week" },
-  sales_person_id: { label: "Sales Person", type: "number" },
   expected_delivery_date: { label: "Expected Delivery Date" },
   order_status: { label: "Order Status" },
   priority: { label: "Priority" },
@@ -191,7 +183,7 @@ export const getOrderDetails = async (req, res) => {
 
     switch (method) {
       case "PUT": {
-        const { order, items } = normalizePayload(req.body, req.user);
+        const { order, items } = await normalizePayload(req.body, req.user);
         const payloadError = validateOrderPayload(order, items);
         if (payloadError) {
           return failureResponse(res, { code: 2001, httpStatus: 400, message: payloadError });
@@ -218,7 +210,7 @@ export const getOrderDetails = async (req, res) => {
           return failureResponse(res, { code: 2004, httpStatus: 404 });
         }
 
-        const { order, items } = normalizePayload(req.body, req.user);
+        const { order, items } = await normalizePayload(req.body, req.user);
         const payloadError = validateOrderPayload(order, items);
         if (payloadError) {
           return failureResponse(res, { code: 2001, httpStatus: 400, message: payloadError });
@@ -262,11 +254,16 @@ export const getOrderDetails = async (req, res) => {
         //   where.company_id = req.user.company_id;
         // }
 
-        const details = await CommonModel.getMasterDetails(MODULE_TABLE, "*", where);
+        const details = await query(
+          `SELECT oi.*, c.cat_color as order_status_color
+           FROM ${DB_PREFIX}${MODULE_TABLE} oi
+           LEFT JOIN ${DB_PREFIX}categories c ON oi.order_status = c.slug
+           WHERE oi.order_id = ?`,
+          [order_id]
+        );
         if (!details.length) {
           return failureResponse(res, { code: 2004, httpStatus: 404 });
         }
-
         const items = await query(
           `SELECT oi.*, p.product_code, p.product_name, p.brand, p.standard_rate, p.gst_rate, p.weight
            FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
@@ -464,7 +461,6 @@ export const changeStatus = async (req, res) => {
     });
   }
 };
-
 
 
 

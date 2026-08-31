@@ -41,13 +41,6 @@ const custom_columns = {
     key2: "company_id",
     select: "",
   },
-  sales_person_id: {
-    table: "admin",
-    alias: "sp",
-    column: "name",
-    key2: "adminID",
-    select: "",
-  },
   created_by: {
     table: "admin",
     alias: "ad",
@@ -415,9 +408,6 @@ export const getDetails = async (req, res) => {
     const customerRows = orderDetails.customer_id
       ? await CommonModel.getMasterDetails("customer", "name AS customer_name, mobile_no AS customer_mobile, email AS customer_email", { customer_id: orderDetails.customer_id })
       : [];
-    const salesPersonRows = orderDetails.sales_person_id
-      ? await CommonModel.getMasterDetails("admin", "name AS sales_person_name", { adminID: orderDetails.sales_person_id })
-      : [];
 
     const items = await query(
       `SELECT oi.order_item_id, oi.order_id, oi.company_id, oi.product_id,
@@ -452,7 +442,6 @@ export const getDetails = async (req, res) => {
         data: {
           ...orderDetails,
           ...(customerRows[0] || {}),
-          ...(salesPersonRows[0] || {}),
           items,
         },
       },

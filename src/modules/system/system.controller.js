@@ -2,6 +2,7 @@ import * as CommonModel from "#shared/models/common.model.js";
 import { query, DB_PREFIX } from "#config/database.js";
 import { successResponse, failureResponse } from "#shared/utils/apiResponse.js";
 import { isSuperAdminRole as isSuperAdmin } from "#shared/utils/role.utils.js";
+import { getExchangeRates } from "./currency.service.js";
 
 // ======================================================
 // GET DEFINATIONS
@@ -57,6 +58,33 @@ export const getDefinations = async (req, res) => {
       code: 2004,
       httpStatus: 404,
       message: "No definitions found",
+    });
+  } catch (error) {
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message,
+    });
+  }
+};
+
+export const getCurrencyExchangeRates = async (req, res) => {
+  try {
+    const rawCurrencies = req.query?.currencies || req.body?.currencies || "";
+    const currencies = Array.isArray(rawCurrencies)
+      ? rawCurrencies
+      : String(rawCurrencies || "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+    const data = await getExchangeRates(currencies.length ? currencies : undefined);
+
+    return successResponse(res, {
+      code: 1004,
+      httpStatus: 200,
+      data,
+      message: data.source === "cache" ? "Exchange rates loaded from today's cache" : "Exchange rates loaded",
     });
   } catch (error) {
     return failureResponse(res, {

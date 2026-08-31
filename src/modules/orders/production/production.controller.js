@@ -35,13 +35,6 @@ const custom_columns = {
     key2: "slug",
     select: "cp.cat_color as priority_color",
   },
-  sales_person_id: {
-    table: "admin",
-    alias: "sp",
-    column: "name",
-    key2: "adminID",
-    select: "",
-  },
   created_by: {
     table: "admin",
     alias: "ad",
@@ -355,7 +348,6 @@ export const getDetails = async (req, res) => {
     if (!orderDetails) return failureResponse(res, { code: 2004, httpStatus: 404 });
 
     const customerRows = orderDetails.customer_id ? await CommonModel.getMasterDetails("customer", "name AS customer_name, mobile_no AS customer_mobile, email AS customer_email", { customer_id: orderDetails.customer_id }) : [];
-    const salesPersonRows = orderDetails.sales_person_id ? await CommonModel.getMasterDetails("admin", "name AS sales_person_name", { adminID: orderDetails.sales_person_id }) : [];
 
     const items = await query(
       `SELECT oi.order_item_id, oi.order_id, oi.company_id, oi.product_id,
@@ -386,7 +378,7 @@ export const getDetails = async (req, res) => {
       [orderId]
     );
 
-    return successResponse(res, { code: 1004, httpStatus: 200, data: { data: { ...orderDetails, ...(customerRows[0] || {}), ...(salesPersonRows[0] || {}), items } } });
+    return successResponse(res, { code: 1004, httpStatus: 200, data: { data: { ...orderDetails, ...(customerRows[0] || {}), items } } });
   } catch (error) {
     return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
   }
@@ -402,12 +394,12 @@ export const startProduction = async (req, res) => {
       data: { order_status: "production", modified_by: req.user.adminID, modified_date: toMysqlDateTime() },
       where,
     });
-    console.log('result :',result);
+    console.log('result :', result);
     if (!result.affectedRows) return failureResponse(res, { code: 2004, httpStatus: 404 });
     return successResponse(res, { code: 1002, httpStatus: 200, data: { order_id: orderId, order_status: "production" }, message: "Production started successfully" });
   } catch (error) {
     console.log(error);
-    
+
     return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
   }
 };

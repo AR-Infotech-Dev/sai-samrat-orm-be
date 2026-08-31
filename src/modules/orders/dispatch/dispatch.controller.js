@@ -233,7 +233,7 @@ export const details = async (req, res) => {
     const dispatchDetails = dispatchRows.find((row) => row.status !== "delete");
     if (!dispatchDetails) return failureResponse(res, { code: 2004, httpStatus: 404, message: "Dispatch not found" });
 
-    const orderRows = await CommonModel.getMasterDetails(ORDERS_TABLE, "order_no, order_status, total_value_in_inr, expected_delivery_date", { order_id: dispatchDetails.order_id });
+    const orderRows = await CommonModel.getMasterDetails(ORDERS_TABLE, "order_no, order_status, currency, exchange_rate, total_order_value, total_value_in_inr, expected_delivery_date", { order_id: dispatchDetails.order_id });
     const customerRows = dispatchDetails.customer_id ? await CommonModel.getMasterDetails("customer", "name AS customer_name, mobile_no AS customer_mobile, email AS customer_email", { customer_id: dispatchDetails.customer_id }) : [];
     const items = await query(
       `SELECT di.*, COALESCE(oi.product_name_snapshot, p.product_name) AS product_name,

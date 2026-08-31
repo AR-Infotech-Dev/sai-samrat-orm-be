@@ -1,4 +1,5 @@
 ﻿import { validateBody } from "#shared/utils/bodyValidator.js";
+import { getExchangeRate, normalizeCurrencyCode } from "#modules/system/currency.service.js";
 const allowedStatuses = ["draft", "waiting", "confirmed", "planned", "production", "ready", "dispatch", "hold", "cancelled", "completed"];
 const allowedPriorities = ["low", "normal", "high", "urgent"];
 
@@ -11,7 +12,6 @@ const orderValidationRules = {
   order_date: { label: "Order Date", required: true },
   order_month: { label: "Order Month" },
   order_week: { label: "Order Week" },
-  sales_person_id: { label: "Sales Person", type: "number" },
   expected_delivery_date: { label: "Expected Delivery Date" },
   order_status: { label: "Order Status" },
   priority: { label: "Priority" },
@@ -41,6 +41,8 @@ const normalizeEnum = (value, allowedValues, fallback) => {
   const normalized = String(value || "").toLowerCase().trim().replace(/\s+/g, "_");
   return allowedValues.includes(normalized) ? normalized : fallback;
 };
+const hasNumericValue = (value) => value !== undefined && value !== null && value !== "" && Number.isFinite(Number(value));
+const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
 const buildOrderNo = () => {
   const now = new Date();
   const yyyy = now.getFullYear();
@@ -51,20 +53,25 @@ const buildOrderNo = () => {
   const ss = String(now.getSeconds()).padStart(2, "0");
   return `SSO-${yyyy}${mm}${dd}-${hh}${mi}${ss}`;
 };
-export const normalizePayload = (body = {}, user = {}) => {
+export const normalizePayload = async (body = {}, user = {}) => {
   const order = body.order && typeof body.order === "object" ? body.order : body;
   const items = Array.isArray(body.items) ? body.items : [];
   const summary = body.summary && typeof body.summary === "object" ? body.summary : {};
   const orderDate = firstValidString(order.order_date);
   const orderMonth = firstValidString(order.order_month) || (orderDate ? orderDate.slice(0, 7) : null);
+  const currency = normalizeCurrencyCode(firstValidString(order.currency) || "INR");
+  const exchangeRate = await getExchangeRate(currency);
 
   const validItems = items
     .map((item) => {
       const qty = toNumber(item.order_qty ?? item.qty);
-      const rate = toNumber(item.unit_rate ?? item.unitRate);
+      const inrRateSource = item.unit_rate_in_inr ?? item.unitRateInInr ?? item.standard_rate_in_inr ?? item.standard_rate;
+      const rate = hasNumericValue(inrRateSource)
+        ? roundMoney(toNumber(inrRateSource) * exchangeRate)
+        : roundMoney(toNumber(item.unit_rate ?? item.unitRate));
       const gst = toNumber(item.gst_rate ?? item.gst);
       const taxableValue = qty * rate;
-      const lineValue = toNumber(item.line_value, taxableValue + taxableValue * (gst / 100));
+      const lineValue = roundMoney(taxableValue + taxableValue * (gst / 100));
       const productId = toNumber(item.product_id ?? item.id, 0);
 
       return {
@@ -83,9 +90,9 @@ export const normalizePayload = (body = {}, user = {}) => {
     .filter((item) => item.product_id > 0 && item.product_name_snapshot && item.order_qty > 0);
 
   const calculatedQty = validItems.reduce((total, item) => total + toNumber(item.order_qty), 0);
-  const calculatedValue = validItems.reduce((total, item) => total + toNumber(item.line_value), 0);
-  const subtotal = toNumber(summary.subtotal, validItems.reduce((total, item) => total + toNumber(item.order_qty) * toNumber(item.unit_rate), 0));
-  const grandTotal = toNumber(summary.grandTotal, calculatedValue);
+  const calculatedValue = roundMoney(validItems.reduce((total, item) => total + toNumber(item.line_value), 0));
+  const subtotal = roundMoney(validItems.reduce((total, item) => total + toNumber(item.order_qty) * toNumber(item.unit_rate), 0));
+  const grandTotal = calculatedValue;
 
   const normalizedOrder = {
     order_id: order.order_id || null,
@@ -96,15 +103,14 @@ export const normalizePayload = (body = {}, user = {}) => {
     order_date: orderDate,
     order_month: orderMonth,
     order_week: firstValidString(order.order_week),
-    sales_person_id: toNumber(order.sales_person_id, 0) || null,
     expected_delivery_date: firstValidString(order.expected_delivery_date),
     order_status: normalizeEnum(order.order_status, allowedStatuses, "draft"),
     priority: normalizeEnum(order.priority || order.order_priority, allowedPriorities, "normal"),
     total_order_qty: toNumber(summary.totalQty ?? order.total_order_qty, calculatedQty),
-    total_order_value: toNumber(order.total_order_value ?? summary.subtotal, subtotal),
-    currency: firstValidString(order.currency) || "INR",
-    exchange_rate: toNumber(order.exchange_rate, 1),
-    total_value_in_inr: toNumber(order.total_value_in_inr ?? summary.grandTotal, grandTotal),
+    total_order_value: subtotal,
+    currency,
+    exchange_rate: exchangeRate,
+    total_value_in_inr: grandTotal,
     source: firstValidString(order.source) || "manual",
     excel_row_no: order.excel_row_no || null,
     remarks: firstValidString(order.remarks, order.remark),
@@ -126,7 +132,4 @@ export const validateOrderPayload = (order, items) => {
   }
   return "";
 };
-
-
-
 

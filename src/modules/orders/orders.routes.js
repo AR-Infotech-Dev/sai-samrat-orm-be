@@ -11,6 +11,7 @@ const ordersRoutes = express.Router();
 
 ordersRoutes.post("/confirmation", requirePermission(["order-confirmation"], "view"), confirmationController.list);
 ordersRoutes.get("/confirmation/:id", requirePermission(["order-confirmation"], "view"), confirmationController.details);
+ordersRoutes.get("/confirmation/:id/proforma-invoice/preview", requirePermission(["order-confirmation"], "view"), confirmationController.proformaInvoicePreview);
 ordersRoutes.post("/confirmation/:id/confirm", requirePermission(["order-confirmation"], "edit"), confirmationController.confirm);
 ordersRoutes.post("/confirmation/:id/hold", requirePermission(["order-confirmation"], "edit"), confirmationController.hold);
 ordersRoutes.post("/confirmation/:id/send-back", requirePermission(["order-confirmation"], "edit"), confirmationController.sendBack);

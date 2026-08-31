@@ -43,6 +43,11 @@ const normalizeId = (value) => {
   const id = Number(value);
   return Number.isInteger(id) && id > 0 ? id : null;
 };
+const getImportCompanyId = (user, row = {}) =>
+  (isSuperAdminRole(user) ? normalizeId(row.company_id) : null)
+  ?? normalizeId(user?.company_id)
+  ?? normalizeId(row.company_id)
+  ?? 0;
 const isClearValue = (value) => String(value || "").trim().toUpperCase() === CUSTOMER_WORKBOOK_CLEAR_VALUE;
 const hasValue = (value) => value !== undefined && value !== null && String(value).trim() !== "";
 const normalizeMobile = (value) => String(value || "").replace(/\D/g, "");
@@ -76,6 +81,51 @@ const getLinkedRows = (lookup, customerRow) => {
   return lookup.get(id ? `id:${id}` : `code:${code}`) || [];
 };
 
+const splitMobileNumbers = (value) =>
+  String(value || "")
+    .split(",")
+    .map((item) => normalizeMobile(item))
+    .filter(Boolean);
+
+const buildInlineContactRows = (customerRow, existingContacts = []) => {
+  const mobileNumbers = splitMobileNumbers(customerRow.contact_mobile_numbers);
+  const hasInlineContact = [
+    customerRow.contact_name,
+    customerRow.contact_mobile_numbers,
+    customerRow.contact_email,
+    customerRow.contact_designation,
+    customerRow.contact_department,
+  ].some(hasValue);
+
+  if (!hasInlineContact) return [];
+
+  const fallbackMobile = normalizeMobile(customerRow.wa_no);
+  const numbers = mobileNumbers.length ? mobileNumbers : fallbackMobile ? [fallbackMobile] : [""];
+  const existingByMobile = new Map(
+    existingContacts
+      .filter((contact) => normalizeMobile(contact.mobile_no))
+      .map((contact) => [normalizeMobile(contact.mobile_no), contact])
+  );
+  const primaryExisting = existingContacts.find((contact) => contact.is_primary === "y") || existingContacts[0] || null;
+
+  return numbers.map((mobile, index) => {
+    const matchedContact = mobile ? existingByMobile.get(mobile) : index === 0 ? primaryExisting : null;
+    return {
+      __row: customerRow.__row,
+      action: "",
+      customer_code: customerRow.customer_code,
+      customer_id: customerRow.customer_id,
+      contact_id: matchedContact?.contact_id || "",
+      name: customerRow.contact_name || matchedContact?.name || customerRow.name || "",
+      mobile_no: mobile || matchedContact?.mobile_no || "",
+      email: index === 0 ? (customerRow.contact_email || matchedContact?.email || "") : "",
+      designation: index === 0 ? (customerRow.contact_designation || matchedContact?.designation || "") : "",
+      department: index === 0 ? (customerRow.contact_department || matchedContact?.department || "") : "",
+      is_primary: index === 0 ? "y" : "n",
+    };
+  });
+};
+
 const readCell = (row, key, { newRecord = false } = {}) => {
   if (!Object.prototype.hasOwnProperty.call(row, key)) return undefined;
   const value = row[key];
@@ -106,7 +156,7 @@ const getIncomingPrimary = (contactRows = []) => {
 
 const findExistingCustomer = async ({ executor, row, user, contactRows }) => {
   const customerId = normalizeId(row.customer_id);
-  const userCompanyId = isSuperAdminRole(user) ? normalizeId(row.company_id) : normalizeId(user.company_id);
+  const userCompanyId = getImportCompanyId(user, row);
 
   if (customerId) {
     const params = [customerId];
@@ -125,7 +175,6 @@ const findExistingCustomer = async ({ executor, row, user, contactRows }) => {
   const email = String(primary?.email || "").trim().toLowerCase();
   const mobile = normalizeMobile(primary?.mobile_no);
   if (!name || (!email && !mobile)) return null;
-  if (!userCompanyId) throw new Error("Company ID is required for a new customer.");
 
   const matchParts = [];
   const params = [name.toLowerCase(), userCompanyId];
@@ -402,7 +451,38 @@ export const getCustomerContactsForWorkbook = async (customerIds = []) => {
 export const buildCustomerExportWorkbook = async (customers = [], selectedColumns = []) => {
   const customerIds = customers.map((customer) => normalizeId(customer.customer_id)).filter(Boolean);
   const contacts = await getCustomerContactsForWorkbook(customerIds);
-  return buildCustomerWorkbook({ customers, contacts, selectedColumns });
+  const primaryContactByCustomer = new Map();
+  const mobilesByCustomer = new Map();
+
+  contacts.forEach((contact) => {
+    const customerId = normalizeId(contact.customer_id);
+    if (!customerId) return;
+
+    const mobileList = mobilesByCustomer.get(customerId) || [];
+    if (contact.mobile_no) mobileList.push(contact.mobile_no);
+    mobilesByCustomer.set(customerId, mobileList);
+
+    if (!primaryContactByCustomer.has(customerId) || contact.is_primary === "y") {
+      primaryContactByCustomer.set(customerId, contact);
+    }
+  });
+
+  return buildCustomerWorkbook({
+    customers: customers.map((customer) => {
+      const customerId = normalizeId(customer.customer_id);
+      const primaryContact = primaryContactByCustomer.get(customerId) || {};
+      return {
+        ...customer,
+        primary_contact_name: primaryContact.name || "",
+        contact_mobile_numbers: [...new Set(mobilesByCustomer.get(customerId) || [])].join(","),
+        primary_contact_email: primaryContact.email || "",
+        primary_contact_designation: primaryContact.designation || "",
+        primary_contact_department: primaryContact.department || "",
+      };
+    }),
+    contacts,
+    selectedColumns,
+  });
 };
 
 export const importCustomerWorkbook = async ({ workbook, user, dryRun = false }) => {
@@ -449,28 +529,25 @@ export const importCustomerWorkbook = async ({ workbook, user, dryRun = false })
       if (normalizeAction(customerRow.action) === "DELETE") {
         throw new Error("Customer deletion is not allowed from import. Delete it from the application.");
       }
-      if (!normalizeId(customerRow.customer_id) && !normalizeCode(customerRow.customer_code)) {
-        throw new Error("Customer Code is required when Customer ID is blank.");
-      }
       const customerReference = normalizeId(customerRow.customer_id)
         ? `id:${normalizeId(customerRow.customer_id)}`
         : `code:${normalizeCode(customerRow.customer_code)}`;
-      if (duplicateCustomerReferences.has(customerReference)) {
+      if (customerReference && duplicateCustomerReferences.has(customerReference)) {
         throw new Error("Duplicate Customer ID or Customer Code found in the Customers sheet.");
       }
 
       await connection.beginTransaction();
-      const contactRows = getLinkedRows(contactLookup, customerRow);
+      const linkedContactRows = getLinkedRows(contactLookup, customerRow);
       const productRows = getLinkedRows(productLookup, customerRow);
       const repeatedSerial = productRows
         .map((row) => String(row.serial_number || "").trim().toLowerCase())
         .find((serial) => serial && duplicateWorkbookSerials.has(serial));
       if (repeatedSerial) throw new Error(`Duplicate product serial number in workbook: ${repeatedSerial}`);
-      const existing = await findExistingCustomer({ executor: connection, row: customerRow, user, contactRows });
+      const matchContactRows = linkedContactRows.length ? linkedContactRows : buildInlineContactRows(customerRow);
+      const existing = await findExistingCustomer({ executor: connection, row: customerRow, user, contactRows: matchContactRows });
       assertRowVersion(customerRow, existing);
       const newCustomer = !existing;
-      const companyId = existing?.company_id || (isSuperAdminRole(user) ? normalizeId(customerRow.company_id) : normalizeId(user.company_id));
-      if (!companyId) throw new Error("Company ID is required.");
+      const companyId = existing?.company_id ?? getImportCompanyId(user, customerRow);
 
       const changes = buildCustomerChanges(customerRow, newCustomer);
       if (newCustomer && !changes.name) throw new Error("Customer Name is required.");
@@ -493,6 +570,8 @@ export const importCustomerWorkbook = async ({ workbook, user, dryRun = false })
       const existingContacts = existing
         ? await queryWith(connection, `SELECT * FROM ${DB_PREFIX}customer_contacts WHERE customer_id = ? ORDER BY is_primary DESC, contact_id`, [existing.customer_id])
         : [];
+      const inlineContactRows = buildInlineContactRows(customerRow, existingContacts);
+      const contactRows = linkedContactRows.length ? linkedContactRows : inlineContactRows;
       const contactState = buildContactState(existingContacts, contactRows, newCustomer);
       const productState = await buildProductState({
         customerId: existing?.customer_id || null,

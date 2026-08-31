@@ -3,6 +3,7 @@ import { query, DB_PREFIX } from "#config/database.js";
 import { successResponse, failureResponse } from "#shared/utils/apiResponse.js";
 import { prepareFilterData } from "#shared/utils/filter.builder.js";
 import { toMysqlDateTime } from "#shared/utils/dateTime.js";
+import { renderTemplate } from "#shared/utils/templateMaker.js";
 // import { isSuperAdminRole as isSuperAdmin } from "#shared/utils/role.utils.js";
 import { env } from "#config/env.js";
 
@@ -38,13 +39,7 @@ const custom_columns = {
     key2: "company_id",
     select: "",
   },
-  sales_person_id: {
-    table: "admin",
-    alias: "sp",
-    column: "name",
-    key2: "adminID",
-    select: "",
-  },
+
   created_by: {
     table: "admin",
     alias: "ad",
@@ -109,13 +104,170 @@ const buildActionRemarks = ({ currentRemarks = "", nextStatus, remarks = "" }) =
 
 const getOrderItems = async (orderId) => {
   return query(
-    `SELECT oi.*, p.product_code, p.product_name, p.brand, p.standard_rate, p.gst_rate, p.weight
+    `SELECT oi.*, p.product_code, p.product_name, p.brand, p.unit, p.standard_rate, p.gst_rate, p.weight
      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
      LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
      WHERE oi.order_id = ? AND oi.status <> 'delete'
      ORDER BY oi.order_item_id ASC`,
     [orderId]
   );
+};
+
+const toNumber = (value, fallback = 0) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+const formatDate = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString("en-GB").replace(/\//g, "-");
+};
+
+const formatNumber = (value, minimumFractionDigits = 0) =>
+  new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits,
+    maximumFractionDigits: minimumFractionDigits,
+  }).format(toNumber(value));
+
+const getCurrencySymbol = (currency = "INR") => {
+  const normalized = String(currency || "INR").trim().toUpperCase();
+  const map = { INR: "₹", USD: "$", EUR: "€", GBP: "£", JPY: "¥" };
+  return map[normalized] || normalized;
+};
+
+const valueOrDash = (...values) => {
+  const value = values.find((item) => item !== undefined && item !== null && String(item).trim() !== "");
+  return value === undefined ? "-" : String(value).trim();
+};
+
+const buildAmountWords = (amount, currency = "INR") => {
+  const rounded = Math.round(toNumber(amount));
+  if (!rounded) return `${currency} ZERO ONLY`;
+  return `${currency} ${formatNumber(rounded).replace(/,/g, " ")} ONLY`;
+};
+
+const getCompanyDetails = async (companyId) => {
+  if (!companyId) return null;
+  const rows = await query(`SELECT * FROM ${DB_PREFIX}company_master WHERE company_id = ? LIMIT 1`, [companyId]);
+  return rows?.[0] || null;
+};
+
+const buildExporter = (company = null) => ({
+  name: valueOrDash(company?.company_name),
+  tagline: valueOrDash(company?.tagline, company?.company_description),
+  address: valueOrDash(company?.company_address, company?.address),
+  email: valueOrDash(company?.company_email, company?.email),
+  phone: valueOrDash(company?.company_mobile, company?.mobile_no, company?.phone),
+  iec_code: valueOrDash(company?.iec_code),
+  pan: valueOrDash(company?.pan),
+  gst: valueOrDash(company?.gst_no, company?.gst_number),
+});
+
+const getProformaInvoiceData = async (orderId) => {
+  const orders = await query(
+    `SELECT o.*,
+            cu.name AS customer_name,
+            cu.email AS customer_email,
+            cu.mobile_no AS customer_mobile,
+            cu.address AS customer_address,
+            cu.company_name AS customer_company_name,
+            cu.gst_number AS customer_gst_number
+     FROM ${DB_PREFIX}${MODULE_TABLE} o
+     LEFT JOIN ${DB_PREFIX}customer cu ON o.customer_id = cu.customer_id
+     WHERE o.order_id = ? AND o.status <> 'delete'
+     LIMIT 1`,
+    [orderId]
+  );
+
+  if (!orders.length) return null;
+
+  const order = orders[0];
+  const items = await getOrderItems(orderId);
+  const company = await getCompanyDetails(order.company_id);
+  const currency = order.currency || "INR";
+  const totalQty = items.reduce((total, item) => total + toNumber(item.order_qty), 0);
+  const totalWeight = items.reduce((total, item) => total + (toNumber(item.order_qty) * toNumber(item.weight)), 0);
+  const invoiceTotal = items.reduce((total, item) => total + toNumber(item.line_value), 0);
+  const customerName = valueOrDash(order.customer_company_name, order.customer_name);
+  const customerAddress = valueOrDash(order.customer_address);
+
+  return {
+    exporter: buildExporter(company),
+    invoice: {
+      pi_no: `PI/${order.order_no || order.order_id}`,
+      pi_date: formatDate(order.order_date || order.created_date),
+      currency,
+      currency_symbol: getCurrencySymbol(currency),
+      remarks: valueOrDash(order.remarks),
+    },
+    terms: {
+      payment: "30% Advance along with PI & Balance against proof of BL",
+      delivery: "Within 30 Days from the date of Advance along with PO",
+      delivery_terms: "FOB Nhava Sheva (Freight Cost at Actual at the time of Supply)",
+      packing: "-",
+      validity: "7 Days from the date of Generation of this PI",
+      other_term: "-",
+    },
+    customer: {
+      name: customerName,
+      address: customerAddress,
+      country: valueOrDash(order.country),
+      email: valueOrDash(order.customer_email),
+      mobile: valueOrDash(order.customer_mobile),
+      vat_no: valueOrDash(order.customer_gst_number),
+    },
+    consignee: {
+      name: customerName,
+      address: customerAddress,
+      country: valueOrDash(order.country),
+      email: valueOrDash(order.customer_email),
+      mobile: valueOrDash(order.customer_mobile),
+      vat_no: valueOrDash(order.customer_gst_number),
+    },
+    shipment: {
+      country_of_origin: "INDIA",
+      port_of_loading: "-",
+      country_of_export: "INDIA",
+      port_of_discharge: "-",
+      final_destination: valueOrDash(order.country),
+    },
+    bank: {
+      transfer_to: "-",
+      account_no: "-",
+      name: "-",
+      bank_name: "-",
+      swift_code: "-",
+      correspondent_bank: "-",
+    },
+    items: items.map((item, index) => ({
+      sr_no: index + 1,
+      brand: valueOrDash(order.brand, item.brand_snapshot, item.brand),
+      model_code: valueOrDash(item.product_code_snapshot, item.product_code),
+      description: valueOrDash(item.product_name_snapshot, item.product_name),
+      marking: valueOrDash(item.product_name_snapshot, item.product_name),
+      hsn_code: valueOrDash(item.hsn_code, "85072000"),
+      weight: formatNumber(item.weight),
+      qty: formatNumber(item.order_qty),
+      unit: valueOrDash(item.unit, "Nos"),
+      rate: formatNumber(item.unit_rate, 2),
+      line_value: formatNumber(item.line_value, 2),
+    })),
+    blankRows: Array.from({ length: Math.max(0, 5 - items.length) }),
+    summary: {
+      containers: "-",
+      total_qty: formatNumber(totalQty),
+      net_weight: formatNumber(totalWeight),
+      gross_weight: formatNumber(totalWeight + totalQty * 2),
+      invoice_total: formatNumber(invoiceTotal, 2),
+      insurance: "-",
+      freight: "at actual",
+      advance_received: "-",
+      pi_total: formatNumber(invoiceTotal, 2),
+      amount_in_words: buildAmountWords(invoiceTotal, currency),
+    },
+  };
 };
 
 const updateOrderStatus = async ({ req, res, action, ids, remarks }) => {
@@ -275,7 +427,7 @@ export const getDetails = async (req, res) => {
     //   return failureResponse(res, { code: 2004, httpStatus: 404 });
     // }
     const orderDetails = await CommonModel.GetMasterListDetails({
-      select: "t.*, cu.name as customer_name, cu.email, cu.email as customer_email, cu.mobile_no as customer_mobile, cu.address as customer_address, sp.name as sales_person_name",
+      select: "t.*, cu.name as customer_name, cu.email, cu.email as customer_email, cu.mobile_no as customer_mobile, cu.address as customer_address",
       table: MODULE_TABLE,
       where: [
         `order_id = ${order_id}`
@@ -315,14 +467,7 @@ export const getDetails = async (req, res) => {
         //   key2: 'company_id',
         //   column: 'company_name'
         // },
-        {
-          type: 'LEFT JOIN',
-          table: 'admin',
-          alias: 'sp',
-          key1: 'sales_person_id',
-          key2: 'adminID',
-          column: 'name'
-        },
+    
         // {
         //   type: 'LEFT JOIN',
         //   table: 'admin',
@@ -363,6 +508,46 @@ export const changeStatus = async (req, res) => {
   try {
     const { action = "", ids = [], remarks = "" } = req.body || {};
     return updateOrderStatus({ req, res, action, ids, remarks });
+  } catch (error) {
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message,
+    });
+  }
+};
+
+export const proformaInvoicePreview = async (req, res) => {
+  try {
+    const { id: orderId } = req.params;
+    if (!orderId) {
+      return failureResponse(res, {
+        code: 2001,
+        httpStatus: 400,
+        message: "Order ID is required",
+      });
+    }
+
+    const data = await getProformaInvoiceData(orderId);
+    if (!data) {
+      return failureResponse(res, {
+        code: 2004,
+        httpStatus: 404,
+        message: "Order not found",
+      });
+    }
+
+    const html = await renderTemplate("proformaInvoice", "preview", data);
+    return successResponse(res, {
+      code: 1004,
+      httpStatus: 200,
+      data: {
+        data: {
+          html,
+          invoice: data.invoice,
+        },
+      },
+    });
   } catch (error) {
     return failureResponse(res, {
       code: 2008,

@@ -83,10 +83,14 @@ export const renderTemplate = async (name, type, data = {}) => {
     const folderMap = {
         email: "emails",
         excel: "excels",
+        html: "html",
+        preview: "previews",
     };
     const extensionMap = {
         email: ".email.hbs",
         excel: ".excel.hbs",
+        html: ".html.hbs",
+        preview: ".preview.hbs",
     };
     const templatePath = path.join(
         __dirname,

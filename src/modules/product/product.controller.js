@@ -1,10 +1,13 @@
 import * as CommonModel from "#shared/models/common.model.js";
+import * as XLSX from "xlsx";
 import { successResponse, failureResponse } from "#shared/utils/apiResponse.js";
 import { prepareFilterData } from "#shared/utils/filter.builder.js";
 import { toMysqlDateTime } from "#shared/utils/dateTime.js";
 import { validateBody } from "#shared/utils/bodyValidator.js";
 import { isSuperAdminRole as isSuperAdmin } from "#shared/utils/role.utils.js";
 import { env } from "#config/env.js";
+import { buildProductWorkbook, isProductWorkbook } from "./product-workbook.utils.js";
+import { buildProductExportWorkbook, importProductWorkbook } from "./product-workbook.service.js";
 
 const MODULE_TABLE = "products";
 
@@ -49,10 +52,12 @@ const productValidationRules = {
   brand: { label: "Brand", required: true },
   unit: { label: "Product Unit", required: true },
   standard_rate: { label: "Rate", type: "number", required: true },
-  weight: { label: "Weight", type: "number", required: true },
+  weight: { label: "Weight", type: "number" },
+  ready_stock: { label: "Ready Stock", type: "number" },
+  fg_code: { label: "FG code"},
+  product_description: { label: "product_description" },
   gst_rate: { label: "GST Rate", type: "number", required: true },
   status: { label: "Status", required: true },
-
   company_id: { label: "Company Id", type: "number" },
   created_by: { label: "Created By", type: "number" },
   modified_by: { label: "Modified By", type: "number" },
@@ -149,6 +154,8 @@ export const getProductDetails = async (req, res) => {
     switch (method) {
       case "PUT": {
         const validation = validateBody(req.body, productValidationRules);
+        console.log('validation : ',validation);
+        
         if (!validation.isValid) {
           return failureResponse(res, {
             code: 2001,
@@ -296,6 +303,109 @@ export const changeStatus = async (req, res) => {
       httpStatus: 200,
       data: [],
     });
+  } catch (error) {
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message,
+    });
+  }
+};
+
+export const downloadImportTemplate = async (req, res) => {
+  try {
+    const buffer = buildProductWorkbook({ template: true });
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=product-import-template.xlsx");
+    return res.send(buffer);
+  } catch (error) {
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message,
+    });
+  }
+};
+
+export const importProducts = async (req, res) => {
+  try {
+    if (!req.file?.buffer) {
+      return failureResponse(res, {
+        code: 2001,
+        httpStatus: 400,
+        message: "Product Excel file is required",
+      });
+    }
+
+    const workbook = XLSX.read(req.file.buffer, { type: "buffer", cellDates: true });
+    if (!isProductWorkbook(workbook)) {
+      return failureResponse(res, {
+        code: 2001,
+        httpStatus: 400,
+        message: "Products sheet not found. Please use the product import template.",
+      });
+    }
+
+    const dryRun = String(req.body?.mode || "commit").toLowerCase() === "preview";
+    const result = await importProductWorkbook({ workbook, user: req.user, dryRun });
+
+    return successResponse(res, {
+      code: dryRun ? 1004 : 1001,
+      httpStatus: 200,
+      message: dryRun ? "Import preview generated." : (result.inserted || result.updated ? "Product workbook imported successfully." : "No product changes imported."),
+      data: result,
+    });
+  } catch (error) {
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message,
+    });
+  }
+};
+
+export const exportProducts = async (req, res) => {
+  try {
+    const payload = req.method === "GET" ? req.query : req.body;
+    const { searchText = "", order_by = "created_date", order = "DESC", filters = [] } = payload || {};
+
+    const filterData = prepareFilterData({
+      filters,
+      searchText,
+      other: {
+        orderBy: order_by,
+        order,
+        searchColumns: [
+          "product_name",
+          "product_description",
+        ],
+      },
+      default_columns,
+      custom_columns,
+    });
+
+    const { select, where, values, join, other } = filterData;
+    other.freeTextSearch = searchText;
+    other.searchColumns = [
+      "t.product_name",
+      "t.product_code",
+      "t.brand",
+    ];
+
+    const productDetails = await CommonModel.GetMasterListDetails({
+      select,
+      table: MODULE_TABLE,
+      where,
+      values,
+      join,
+      other,
+    });
+    const buffer = await buildProductExportWorkbook(productDetails);
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", "attachment; filename=Product-Export.xlsx");
+    return res.send(buffer);
   } catch (error) {
     return failureResponse(res, {
       code: 2008,
