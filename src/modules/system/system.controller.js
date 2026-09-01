@@ -128,7 +128,6 @@ export const getFreeTextSearch = async (req, res) => {
     // if (!isSuperAdmin(req.user) && ['customer', 'admin'].includes(tableName)) {
     //   where.push(`t.company_id = ${req.user.company_id} `);
     // }
-    // console.log("isCompanyWise : ",isCompanyWise);
     
     if (tableName === "categories") {
       where.push(`t.is_parent = 'yes' `);

@@ -170,7 +170,7 @@ export const GetMasterListDetails = async ({ select = "*", table = "", where = [
         const safeStart = Number(start) || 0;
         sql += ` LIMIT ${safeLimit} OFFSET ${safeStart}`;
     }
-    printSql(sql, params)
+    // printSql(sql, params)
     const rows = await query(sql, params);
     return rows;
 };
@@ -194,20 +194,15 @@ export const getFilteredCount = async ({ table = "", where = {}, join = [], othe
 // INSERT
 // =====================================
 export const saveMasterDetails = async ({ table = "", data = {} } = {}) => {
-    console.log({ table, data });
-
     const normalizedData = normalizeWriteData(data);
     const columns = Object.keys(normalizedData);
     const values = Object.values(normalizedData);
-
     const placeholders = columns.map(() => "?").join(",");
-
     const sql = `
     INSERT INTO ${DB_PREFIX}${table}
     (${columns.join(",")})
     VALUES (${placeholders})
   `;
-
     const result = await query(sql, values);
     return result;
 };

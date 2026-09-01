@@ -380,7 +380,6 @@ export const list = async (req, res) => {
     // }
 
     const total = await CommonModel.getCountsByParameter({ table: MODULE_TABLE, where, values, join, other, });
-    // console.log(join);
 
     const orderList = await CommonModel.GetMasterListDetails({
       select,

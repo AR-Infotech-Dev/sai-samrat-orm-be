@@ -154,7 +154,6 @@ export const getProductDetails = async (req, res) => {
     switch (method) {
       case "PUT": {
         const validation = validateBody(req.body, productValidationRules);
-        console.log('validation : ',validation);
         
         if (!validation.isValid) {
           return failureResponse(res, {

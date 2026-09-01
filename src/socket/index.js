@@ -14,25 +14,17 @@ export const initSocket = (server) => {
     });
 
     io.on("connection", (socket) => {
-        /* -----------------------------------------------
-           USER ROOM JOIN
-        ----------------------------------------------- */
         socket.on("join_room", (userId) => {
             if (!userId) return;
             const roomName = `user_${userId}`;
             socket.join(roomName);
-            console.log(`✅ Joined Room : ${roomName}`);
+            // console.log(`✅ Joined Room : ${roomName}`);
         });
-
-        /* -----------------------------------------------
-           DISCONNECT
-        ----------------------------------------------- */
         socket.on("disconnect", () => {
-            console.log("❌ Disconnected :", socket.id);
+            // console.log("❌ Disconnected :", socket.id);
         });
     });
-
-    console.log("🚀 Socket Initialized");
+    // console.log("🚀 Socket Initialized");
 };
 
 /* ======================================================
@@ -53,9 +45,7 @@ export const getIO = () => {
 export const emitToUser = (userId, event = "new_notification", payload = {}) => {
     try {
         if (!io || !userId) return;
-
         io.to(`user_${userId}`).emit(event, payload);
-
     } catch (error) {
         console.log("Socket Emit Error :", error.message);
     }

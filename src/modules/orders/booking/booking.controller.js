@@ -122,7 +122,6 @@ export const list = async (req, res) => {
     where.push("t.status <> 'delete'");
     other.freeTextSearch = searchText;
     other.searchColumns = ["t.order_no", "t.brand", "cu.name"];
-    console.log(join);
     
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.push("t.company_id = ?");

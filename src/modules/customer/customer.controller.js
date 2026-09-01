@@ -170,8 +170,6 @@ export const getCustomerDetails = async (req, res) => {
             message: validation.message,
           });
         }
-        console.log('1');
-        
         const data = validation.data;
         const customerContacts = normalizeCustomerContacts(req.body.customer_contacts ?? req.body.contact_persons);
         const customerProducts = normalizeCustomerProducts(req.body.customer_products ?? req.body.product_ids);
@@ -183,8 +181,7 @@ export const getCustomerDetails = async (req, res) => {
             message: serialValidation.message,
           });
         }
-        
-        console.log('2');
+
         delete data.product_ids;
         delete data.customer_contacts;
         delete data.contact_persons;
@@ -192,13 +189,8 @@ export const getCustomerDetails = async (req, res) => {
         data.created_by = req.user.adminID;
         data.company_id = data.company_id || null;
         data.created_date = toMysqlDateTime();
-        
-        console.log('3');
-        console.log('data',data);
-        const result = await createCustomer(data);
-        console.log('4');
 
-        
+        const result = await createCustomer(data);
         await replaceCustomerContacts({ customerId: result.insertId, contacts: customerContacts, user: req.user });
 
         return successResponse(res, {

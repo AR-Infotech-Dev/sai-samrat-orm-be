@@ -394,7 +394,6 @@ export const startProduction = async (req, res) => {
       data: { order_status: "production", modified_by: req.user.adminID, modified_date: toMysqlDateTime() },
       where,
     });
-    console.log('result :', result);
     if (!result.affectedRows) return failureResponse(res, { code: 2004, httpStatus: 404 });
     return successResponse(res, { code: 1002, httpStatus: 200, data: { order_id: orderId, order_status: "production" }, message: "Production started successfully" });
   } catch (error) {

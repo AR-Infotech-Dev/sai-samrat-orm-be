@@ -1,11 +1,14 @@
 ﻿import { validateBody } from "#shared/utils/bodyValidator.js";
 import { getExchangeRate, normalizeCurrencyCode } from "#modules/system/currency.service.js";
+import { query, DB_PREFIX } from "#config/database.js";
 const allowedStatuses = ["draft", "waiting", "confirmed", "planned", "production", "ready", "dispatch", "hold", "cancelled", "completed"];
 const allowedPriorities = ["low", "normal", "high", "urgent"];
+const ORDERS_TABLE = "orders";
 
 const orderValidationRules = {
   order_id: { label: "Order ID", type: "number" },
   order_no: { label: "Order No" },
+  order_code: { label: "Order Code" },
   company_id: { label: "Company Id", type: "number" },
   customer_id: { label: "Customer", type: "number", required: true },
   brand: { label: "Brand" },
@@ -43,22 +46,45 @@ const normalizeEnum = (value, allowedValues, fallback) => {
 };
 const hasNumericValue = (value) => value !== undefined && value !== null && value !== "" && Number.isFinite(Number(value));
 const roundMoney = (value) => Math.round((Number(value) || 0) * 100) / 100;
-const buildOrderNo = () => {
-  const now = new Date();
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  const dd = String(now.getDate()).padStart(2, "0");
-  const hh = String(now.getHours()).padStart(2, "0");
-  const mi = String(now.getMinutes()).padStart(2, "0");
-  const ss = String(now.getSeconds()).padStart(2, "0");
-  return `SSO-${yyyy}${mm}${dd}-${hh}${mi}${ss}`;
+const monthPrefixes = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEPT", "OCT", "NOV", "DEC"];
+const parseOrderDate = (value) => {
+  if (!value) return new Date();
+  const raw = String(value).trim();
+  const dmyMatch = raw.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (dmyMatch) {
+    return new Date(Number(dmyMatch[3]), Number(dmyMatch[2]) - 1, Number(dmyMatch[1]));
+  }
+  return new Date(raw);
+};
+const getOrderDateParts = (value) => {
+  const date = parseOrderDate(value);
+  if (Number.isNaN(date.getTime())) return getOrderDateParts();
+  return {
+    monthPrefix: monthPrefixes[date.getMonth()] || "ORD",
+    orderMonth: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`,
+  };
+};
+const buildOrderNo = async (orderDate) => {
+  const { monthPrefix, orderMonth } = getOrderDateParts(orderDate);
+  const rows = await query(
+    `SELECT order_no FROM ${DB_PREFIX}${ORDERS_TABLE}
+     WHERE order_month = ?
+       AND order_no LIKE ?
+       AND status <> 'delete'`,
+    [orderMonth, `${monthPrefix}-%`]
+  );
+  const nextNo = rows.reduce((maxNo, row) => {
+    const match = String(row.order_no || "").match(new RegExp(`^${monthPrefix}-(\\d+)$`, "i"));
+    return match ? Math.max(maxNo, Number(match[1]) || 0) : maxNo;
+  }, 0) + 1;
+  return `${monthPrefix}-${String(nextNo).padStart(2, "0")}`;
 };
 export const normalizePayload = async (body = {}, user = {}) => {
   const order = body.order && typeof body.order === "object" ? body.order : body;
   const items = Array.isArray(body.items) ? body.items : [];
   const summary = body.summary && typeof body.summary === "object" ? body.summary : {};
   const orderDate = firstValidString(order.order_date);
-  const orderMonth = firstValidString(order.order_month) || (orderDate ? orderDate.slice(0, 7) : null);
+  const orderMonth = firstValidString(order.order_month) || getOrderDateParts(orderDate).orderMonth;
   const currency = normalizeCurrencyCode(firstValidString(order.currency) || "INR");
   const exchangeRate = await getExchangeRate(currency);
 
@@ -96,7 +122,8 @@ export const normalizePayload = async (body = {}, user = {}) => {
 
   const normalizedOrder = {
     order_id: order.order_id || null,
-    order_no: firstValidString(order.order_no) || buildOrderNo(),
+    order_no: firstValidString(order.order_no) || await buildOrderNo(orderDate),
+    order_code: firstValidString(order.order_code, order.production_note, order.productionNote),
     company_id: toNumber(order.company_id || user.company_id, 0),
     customer_id: toNumber(order.customer_id || order.client_id, 0),
     brand: firstValidString(order.brand),

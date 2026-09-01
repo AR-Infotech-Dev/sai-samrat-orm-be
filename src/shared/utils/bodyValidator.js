@@ -48,14 +48,9 @@ export const validateBody = (body = {}, fieldRules = {}) => {
           data: {},
         };
       }
-      
-      
+
+
       if (type === "number" && Number.isNaN(Number(value))) {
-        if (label == "Weight") {
-          console.log('is Number : ', Number.isNaN(Number(value)));
-          console.log('value : ', value);
-          console.log('value : ', Number(value));
-        }
         return {
           isValid: false,
           message: `${label} must be a valid number`,
