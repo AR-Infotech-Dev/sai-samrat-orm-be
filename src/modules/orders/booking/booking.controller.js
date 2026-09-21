@@ -64,6 +64,7 @@ export const orderValidationRules = {
   customer_id: { label: "Customer", type: "number", required: true },
   brand: { label: "Brand" },
   order_date: { label: "Order Date", required: true },
+  order_type: { label: "Order Type", required: true },
   order_month: { label: "Order Month" },
   order_week: { label: "Order Week" },
   expected_delivery_date: { label: "Expected Delivery Date" },
@@ -112,7 +113,7 @@ export const list = async (req, res) => {
       other: {
         orderBy,
         order,
-        searchColumns: ["order_no"],
+        searchColumns: [],
       },
       default_columns,
       custom_columns,
@@ -121,7 +122,7 @@ export const list = async (req, res) => {
     const { select, where, values, join, other } = filterData;
     where.push("t.status <> 'delete'");
     other.freeTextSearch = searchText;
-    other.searchColumns = ["t.order_no", "t.brand", "cu.name"];
+    other.searchColumns = ["t.order_no","t.order_code", "t.brand",];
     
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.push("t.company_id = ?");

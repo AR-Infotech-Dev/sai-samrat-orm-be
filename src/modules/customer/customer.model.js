@@ -4,11 +4,11 @@ import { MODULE_TABLE } from "./customer.constants.js";
 
 export const getCustomerById = (customerId) => CommonModel.getMasterDetails(MODULE_TABLE, "*", { customer_id: customerId });
 
-export const createCustomer = (data) => CommonModel.saveMasterDetails({table: MODULE_TABLE,data,});
+export const createCustomer = (data) => CommonModel.saveMasterDetails({ table: MODULE_TABLE, data, });
 
-export const updateCustomer = (customerId, data) => CommonModel.updateMasterDetails({table: MODULE_TABLE, data,where: { customer_id: customerId }, });
+export const updateCustomer = (customerId, data) => CommonModel.updateMasterDetails({ table: MODULE_TABLE, data, where: { customer_id: customerId }, });
 
-export const deleteCustomers = (ids = []) => CommonModel.deleteMasterDetails({table: MODULE_TABLE,where: { customer_id: ids },});
+export const deleteCustomers = (ids = []) => CommonModel.deleteMasterDetails({ table: MODULE_TABLE, where: { customer_id: ids }, });
 
 export const getCustomerContacts = (customerId) => CommonModel.getMasterDetails("customer_contacts", "name, mobile_no ,email, department, designation, is_primary", { customer_id: customerId });
 
@@ -113,7 +113,7 @@ export const findCustomerProductSerialConflicts = async ({ serialNumbers = [], e
   return conflicts;
 };
 
-export const replaceCustomerContacts = async ({ customerId, contacts = [], user = {} }) => { 
+export const replaceCustomerContacts = async ({ customerId, contacts = [], user = {} }) => {
   await CommonModel.deleteMasterDetails({ table: "customer_contacts", where: { customer_id: customerId } });
 
   if (!contacts.length) {

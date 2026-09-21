@@ -172,24 +172,12 @@ export const getCustomerDetails = async (req, res) => {
         }
         const data = validation.data;
         const customerContacts = normalizeCustomerContacts(req.body.customer_contacts ?? req.body.contact_persons);
-        const customerProducts = normalizeCustomerProducts(req.body.customer_products ?? req.body.product_ids);
-        const serialValidation = await validateCustomerProductSerials({ products: customerProducts });
-        if (!serialValidation.isValid) {
-          return failureResponse(res, {
-            code: 2001,
-            httpStatus: 400,
-            message: serialValidation.message,
-          });
-        }
-
         delete data.product_ids;
         delete data.customer_contacts;
         delete data.contact_persons;
-        data.customer_products = JSON.stringify(customerProducts);
         data.created_by = req.user.adminID;
         data.company_id = data.company_id || null;
         data.created_date = toMysqlDateTime();
-
         const result = await createCustomer(data);
         await replaceCustomerContacts({ customerId: result.insertId, contacts: customerContacts, user: req.user });
 
@@ -221,21 +209,9 @@ export const getCustomerDetails = async (req, res) => {
 
         const data = validation.data;
         const customerContacts = normalizeCustomerContacts(req.body.customer_contacts ?? req.body.contact_persons);
-        const customerProducts = normalizeCustomerProducts(req.body.customer_products ?? req.body.product_ids);
-        const serialValidation = await validateCustomerProductSerials({ products: customerProducts, excludeCustomerId: customer_id });
-        if (!serialValidation.isValid) {
-          return failureResponse(res, {
-            code: 2001,
-            httpStatus: 400,
-            message: serialValidation.message,
-          });
-        }
-
         delete data.customer_id;
-        delete data.product_ids;
         delete data.customer_contacts;
         delete data.contact_persons;
-        data.customer_products = JSON.stringify(customerProducts);
         delete data.created_by;
         data.modified_by = req.user.adminID;
 
@@ -277,9 +253,6 @@ export const getCustomerDetails = async (req, res) => {
         const customerData = details[0];
         const products = parseCustomerProducts(customerData.customer_products);
         const contacts = await getCustomerContacts(customer_id);
-        customerData.product_ids = products.map((product) => product.product_id);
-        customerData.customer_products = products;
-        customerData.products = products;
         customerData.customer_contacts = contacts;
         customerData.contact_persons = contacts;
 

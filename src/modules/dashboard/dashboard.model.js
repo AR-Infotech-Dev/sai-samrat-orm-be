@@ -655,7 +655,7 @@ const getLifecycleBase = async (user, filter, tables) => {
             END`;
 
   const rows = await safeQuery(
-    `SELECT o.order_id, o.order_no, o.order_date, o.expected_delivery_date, o.order_status, o.priority,
+    `SELECT o.order_id, o.order_no,o.order_code, o.order_date, o.expected_delivery_date, o.order_status, o.priority,
             COALESCE(o.currency, 'INR') AS currency,
             ${exchangeRateExpr} AS exchange_rate,
             COALESCE(c.name, '-') AS customer_name,
@@ -672,8 +672,6 @@ const getLifecycleBase = async (user, filter, tables) => {
             ${expr.saipl} AS saipl_qty,
             ${expr.pmk} AS pmk_qty,
             ${expr.produced} AS produced_qty,
-            ${tables.production ? "COALESCE(pr.qc_passed_qty, 0)" : "0"} AS qc_passed_qty,
-            ${tables.production ? "COALESCE(pr.rework_qty, 0)" : "0"} AS rework_qty,
             ${tables.production ? "COALESCE(pr.procured_qty, 0)" : "0"} AS procured_qty,
             ${expr.ready} AS ready_qty,
             ${expr.dispatched} AS dispatched_qty,
@@ -717,8 +715,6 @@ const getLifecycleBase = async (user, filter, tables) => {
       saipl_qty: roundQty(row.saipl_qty),
       pmk_qty: roundQty(row.pmk_qty),
       produced_qty: roundQty(row.produced_qty),
-      qc_passed_qty: roundQty(row.qc_passed_qty),
-      rework_qty: roundQty(row.rework_qty),
       procured_qty: roundQty(row.procured_qty),
       ready_qty: roundQty(row.ready_qty),
       dispatched_qty: roundQty(row.dispatched_qty),
@@ -763,7 +759,15 @@ const getLifecycleDashboard = async (user, filter, tables) => {
 
   const filteredRows = rows.filter(matchesStage);
   const sum = (key, sourceRows = filteredRows) => roundQty(sourceRows.reduce((total, row) => total + toNumber(row[key]), 0));
+  const sumValueForQty = (qtyKey, sourceRows = rows) => roundQty(sourceRows.reduce((total, row) => {
+    const orderQty = toNumber(row.order_qty);
+    if (!orderQty) return total;
+    const qty = Math.min(Math.max(toNumber(row[qtyKey]), 0), orderQty);
+    return total + ((toNumber(row.line_value) * qty) / orderQty);
+  }, 0));
   const countOrders = (sourceRows) => new Set(sourceRows.map((row) => row.order_id).filter(Boolean)).size;
+  const totalOrderCount = countOrders(rows);
+  const totalOrderValue = sum("line_value", rows);
   const tab = (key, label, sourceRows) => ({ key, label, count: countOrders(sourceRows), qty: sum("order_qty", sourceRows) });
 
   return {
@@ -777,17 +781,27 @@ const getLifecycleDashboard = async (user, filter, tables) => {
       tab("dispatch", "Dispatch", stageRows.dispatch),
     ],
     summary: {
-      total_orders: countOrders(rows),
+      total_orders: totalOrderCount,
       total_order_qty: sum("order_qty", rows),
-      total_value: sum("line_value", rows),
+      total_value: totalOrderValue,
+      total_order_value: totalOrderValue,
+      avg_order_value: totalOrderCount ? roundQty(totalOrderValue / totalOrderCount) : 0,
       planned_qty: sum("planned_qty", rows),
+      planned_value: sumValueForQty("planned_qty", rows),
       produced_qty: sum("produced_qty", rows),
+      produced_value: sumValueForQty("produced_qty", rows),
       ready_qty: sum("ready_qty", rows),
+      ready_value: sumValueForQty("ready_qty", rows),
       dispatched_qty: sum("dispatched_qty", rows),
+      dispatched_value: sumValueForQty("dispatched_qty", rows),
       pending_qty: sum("pending_qty", rows),
+      pending_value: sumValueForQty("pending_qty", rows),
       ready_pending_dispatch_qty: sum("ready_pending_dispatch_qty", rows),
+      ready_pending_dispatch_value: sumValueForQty("ready_pending_dispatch_qty", rows),
       pmk_qty: sum("pmk_qty", rows),
+      pmk_value: sumValueForQty("pmk_qty", rows),
       saipl_qty: sum("saipl_qty", rows),
+      saipl_value: sumValueForQty("saipl_qty", rows),
     },
     rows: filteredRows.slice(0, 80),
   };

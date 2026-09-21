@@ -415,6 +415,7 @@ export const getDetails = async (req, res) => {
               COALESCE(oi.product_name_snapshot, p.product_name) AS product_name,
               COALESCE(oi.brand_snapshot, p.brand) AS series,
               p.weight,
+              p.fg_code,
               oi.order_qty, oi.unit_rate, oi.line_value,
               COALESCE(p.gst_rate, 18) AS gst_rate,
               COALESCE(pl.saipl_qty, 0) AS saipl_qty,
@@ -603,5 +604,3 @@ export const changeStatus = async (req, res) => {
 
 export const orderDetails = getDetails;
 export const details = getItemDetails;
-
-

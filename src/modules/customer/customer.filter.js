@@ -17,13 +17,6 @@ export const customColumns = {
     key2: "adminID",
     select: "",
   },
-  responsible_person: {
-    table: "admin",
-    alias: "rp",
-    column: "name",
-    key2: "adminID",
-    select: "",
-  },
   modified_by: {
     table: "admin",
     alias: "am",

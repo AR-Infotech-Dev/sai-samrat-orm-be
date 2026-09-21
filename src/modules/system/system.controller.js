@@ -101,6 +101,9 @@ export const getFreeTextSearch = async (req, res) => {
     const text = String(searchText).trim();
     const where = [];
     const values = [];
+    const allowedFiltersByTable = {
+      customer: ["customer_type"],
+    };
 
     // ===============================
     // INPUT SEARCH
@@ -125,6 +128,13 @@ export const getFreeTextSearch = async (req, res) => {
       where.push(`t.status = ?`);
       values.push("active");
     }
+
+    (allowedFiltersByTable[tableName] || []).forEach((filterKey) => {
+      const filterValue = req.body?.[filterKey];
+      if (filterValue === undefined || filterValue === null || filterValue === "") return;
+      where.push(`t.${filterKey} = ?`);
+      values.push(filterValue);
+    });
     // if (!isSuperAdmin(req.user) && ['customer', 'admin'].includes(tableName)) {
     //   where.push(`t.company_id = ${req.user.company_id} `);
     // }

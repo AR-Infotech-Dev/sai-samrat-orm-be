@@ -372,7 +372,7 @@ export const list = async (req, res) => {
     where.push("t.order_status IN ('waiting','hold')");
 
     other.freeTextSearch = searchText;
-    other.searchColumns = ["t.order_no", "t.brand", "cu.name", "cu.mobile_no", "sp.name"];
+    other.searchColumns = ["t.order_no","t.order_code", "t.brand", "cu.name", "cu.mobile_no"];
 
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.push("t.company_id = ?");

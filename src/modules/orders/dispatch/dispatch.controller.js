@@ -91,9 +91,9 @@ const getReadyOrderItems = async ({ orderId, user }) => {
             COALESCE(oi.brand_snapshot, p.brand) AS series,
             p.weight, oi.order_qty, oi.unit_rate, oi.line_value,
             COALESCE(pl.ready_qty, 0) AS planning_ready_qty,
-            COALESCE(pr.qc_passed_qty, 0) AS qc_passed_qty,
+            COALESCE(pr.produced_qty, 0) AS produced_qty,
             COALESCE(pr.procured_qty, 0) AS procured_qty,
-            COALESCE(COALESCE(pl.ready_qty, 0) + COALESCE(pr.qc_passed_qty, 0) + COALESCE(pr.procured_qty, 0), 0) AS total_ready_qty
+            COALESCE(COALESCE(pl.ready_qty, 0) + COALESCE(pr.produced_qty, 0) + COALESCE(pr.procured_qty, 0), 0) AS total_ready_qty
      FROM ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi
      INNER JOIN ${DB_PREFIX}${ORDERS_TABLE} o ON oi.order_id = o.order_id
      LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
@@ -166,6 +166,9 @@ export const list = async (req, res) => {
     });
 
     const { select, where, values, join, other } = filterData;
+    console.log('select : ', select);
+    console.log('custom_columns : ', custom_columns);
+
     where.push("t.status <> 'delete'");
     other.freeTextSearch = searchText;
     other.searchColumns = ["t.dispatch_no", "o.order_no", "cu.name", "t.transporter_name", "t.vehicle_no", "t.invoice_no"];
@@ -176,7 +179,7 @@ export const list = async (req, res) => {
     // }
 
     const total = await CommonModel.getCountsByParameter({ table: DISPATCH_TABLE, where, values, join, other });
-    const dispatchList = await CommonModel.GetMasterListDetails({ select, table: DISPATCH_TABLE, where, values, limit: getAll === "Y" ? "" : limit, start, join, other });
+    const dispatchList = await CommonModel.GetMasterListDetails({ select: `${select},o.order_code`, table: DISPATCH_TABLE, where, values, limit: getAll === "Y" ? "" : limit, start, join, other });
 
     const dispatchIds = dispatchList.map((row) => row.dispatch_id).filter(Boolean);
     let itemTotals = {};
