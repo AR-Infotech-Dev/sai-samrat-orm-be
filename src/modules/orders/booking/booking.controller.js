@@ -63,6 +63,7 @@ export const orderValidationRules = {
   company_id: { label: "Company Id", type: "number" },
   customer_id: { label: "Customer", type: "number", required: true },
   brand: { label: "Brand" },
+  pi_number: { label: "PI number" },
   order_date: { label: "Order Date", required: true },
   order_type: { label: "Order Type", required: true },
   order_month: { label: "Order Month" },

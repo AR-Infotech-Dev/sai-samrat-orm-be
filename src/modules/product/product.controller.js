@@ -49,12 +49,12 @@ const productValidationRules = {
   product_name: { label: "Product Name", required: true },
   product_code: { label: "Product Code", required: true },
   product_type: { label: "Product Type", required: true },
-  brand: { label: "Brand", required: true },
+  brand: { label: "Brand" },
   unit: { label: "Product Unit", required: true },
   standard_rate: { label: "Rate", type: "number", required: true },
   weight: { label: "Weight", type: "number" },
   ready_stock: { label: "Ready Stock", type: "number" },
-  fg_code: { label: "FG code"},
+  fg_code: { label: "FG code" },
   product_description: { label: "product_description" },
   gst_rate: { label: "GST Rate", type: "number", required: true },
   status: { label: "Status", required: true },
@@ -154,7 +154,7 @@ export const getProductDetails = async (req, res) => {
     switch (method) {
       case "PUT": {
         const validation = validateBody(req.body, productValidationRules);
-        
+
         if (!validation.isValid) {
           return failureResponse(res, {
             code: 2001,
