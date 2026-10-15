@@ -97,13 +97,23 @@ export const getCurrencyExchangeRates = async (req, res) => {
 
 export const getFreeTextSearch = async (req, res) => {
   try {
-    const { text: searchText = "", type = "", tableName = "", wherec = "", list = "*", status = "false", isCompanyWise = false } = req.body;
+    const { text: searchText = "", type = "", tableName = "", wherec = "", list = "*", status = "false", isCompanyWise = false, require_customer = false } = req.body;
     const text = String(searchText).trim();
     const where = [];
     const values = [];
     const allowedFiltersByTable = {
       customer: ["customer_type"],
+      proforma_invoices: ["customer_id", "order_type"],
     };
+
+    if (tableName === "proforma_invoices" && require_customer && !req.body?.customer_id) {
+      return successResponse(res, {
+        code: 1004,
+        httpStatus: 200,
+        data: { data: [] },
+        message: "Select customer first"
+      });
+    }
 
     // ===============================
     // INPUT SEARCH
@@ -117,8 +127,15 @@ export const getFreeTextSearch = async (req, res) => {
         });
       }
 
-      where.push(`t.${wherec} LIKE ?`);
-      values.push(`%${text}%`);
+      const searchColumns = String(wherec || "")
+        .split(",")
+        .map((column) => column.trim())
+        .filter((column) => /^[a-zA-Z0-9_]+$/.test(column));
+
+      if (searchColumns.length) {
+        where.push(`(${searchColumns.map((column) => `t.${column} LIKE ?`).join(" OR ")})`);
+        values.push(...searchColumns.map(() => `%${text}%`));
+      }
     }
 
     // ===============================
@@ -142,7 +159,28 @@ export const getFreeTextSearch = async (req, res) => {
     if (tableName === "categories") {
       where.push(`t.is_parent = 'yes' `);
     }
-    const result = await CommonModel.GetMasterListDetails({ select: list, table: tableName, where, values });
+    let select = list;
+    const join = [];
+    const other = {};
+
+    if (tableName === "proforma_invoices") {
+      select = `
+        t.pi_id, t.pi_no, t.customer_id, cu.name AS customer_name,
+        t.brand, t.order_type, t.pi_date, t.currency, t.exchange_rate,
+        t.total_qty, t.total_value, t.gst_rate, t.pi_status
+      `;
+      join.push({ type: "LEFT JOIN", table: "customer", alias: "cu", key1: "customer_id", key2: "customer_id" });
+      where.push("t.status <> 'delete'");
+      where.push("t.pi_status NOT IN ('cancelled', 'converted')");
+      where.push(`EXISTS (
+        SELECT 1 FROM ${DB_PREFIX}proforma_invoice_items pii
+        WHERE pii.pi_id = t.pi_id AND pii.status <> 'delete' AND pii.qty > pii.booked_qty
+      )`);
+      other.orderBy = "t.pi_id";
+      other.order = "DESC";
+    }
+
+    const result = await CommonModel.GetMasterListDetails({ select, table: tableName, where, values, join, other });
     if (result.length) {
       return successResponse(res, {
         code: 1004,
@@ -152,9 +190,12 @@ export const getFreeTextSearch = async (req, res) => {
         }
       });
     }
-    return failureResponse(res, {
-      code: 2004,
-      httpStatus: 404,
+    return successResponse(res, {
+      code: 1004,
+      httpStatus: 200,
+      data: {
+        data: []
+      },
       message: "No records found"
     });
 

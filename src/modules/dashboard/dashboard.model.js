@@ -52,7 +52,7 @@ const getFilterValue = (filter = {}, ...keys) => {
 };
 
 
-const addCompanyScope = () => {};
+const addCompanyScope = () => { };
 
 const addOrderDateScope = (where, params, filter = {}, alias = "o") => {
   const { fromDate, toDate } = getDateFilter(filter);
@@ -249,7 +249,7 @@ const getSummary = async (user, filter, tables) => {
     metric("pending_qty", "Pending Qty", current.pending_qty, "amber", previous.pending_qty),
     metric("ready_pending_dispatch_qty", "Ready Pending Dispatch", current.ready_pending_dispatch_qty, "amber", previous.ready_pending_dispatch_qty),
     metric("saipl_mfg_qty", "SAIPL MFG", current.saipl_mfg_qty, "red", previous.saipl_mfg_qty),
-    
+
   ];
 };
 
@@ -655,7 +655,7 @@ const getLifecycleBase = async (user, filter, tables) => {
             END`;
 
   const rows = await safeQuery(
-    `SELECT o.order_id, o.order_no,o.order_code, o.order_date, o.expected_delivery_date, o.order_status, o.priority,
+    `SELECT o.order_id, o.pi_number AS pi_number, o.order_no,o.order_code, o.order_date, o.expected_delivery_date, o.order_status, o.priority,
             COALESCE(o.currency, 'INR') AS currency,
             ${exchangeRateExpr} AS exchange_rate,
             COALESCE(c.name, '-') AS customer_name,
@@ -809,49 +809,52 @@ const getLifecycleDashboard = async (user, filter, tables) => {
 
 export const getDashboardOverview = async (user = {}, filter = {}) => {
   const tables = await getAvailableTables();
-  const [summary, pipeline, seriesMix, monthlyOrders, alerts, recentOrders, topProducts, actionKpis, bottleneckBoard, productLoad, criticalAlerts, productionReadyTrend, pmkPending, dispatchDue, lifecycle] = await Promise.all([
-    getSummary(user, filter, tables),
-    getPipeline(user, filter, tables),
-    getSeriesMix(user, filter),
-    getMonthlyOrders(user, filter),
-    getAlerts(user, filter),
-    getRecentOrders(user, filter, tables),
-    getTopProducts(user, filter),
-    getActionKpis(user, filter, tables),
-    getBottleneckBoard(user, filter, tables),
-    getProductLoad(user, filter, tables),
-    getCriticalAlerts(user, filter, tables),
-    getProductionReadyTrend(user, filter),
-    getPmkPending(user, filter),
-    getDispatchDue(user, filter, tables),
+  const [ lifecycle] = await Promise.all([
+    // summary, pipeline, seriesMix, monthlyOrders, alerts, recentOrders, topProducts, actionKpis, bottleneckBoard, productLoad, criticalAlerts, productionReadyTrend, pmkPending, dispatchDue,
+    // getSummary(user, filter, tables),
+    // getPipeline(user, filter, tables),
+    // getSeriesMix(user, filter),
+    // getMonthlyOrders(user, filter),
+    // getAlerts(user, filter),
+    // getRecentOrders(user, filter, tables),
+    // getTopProducts(user, filter),
+    // getActionKpis(user, filter, tables),
+    // getBottleneckBoard(user, filter, tables),
+    // getProductLoad(user, filter, tables),
+    // getCriticalAlerts(user, filter, tables),
+    // getProductionReadyTrend(user, filter),
+    // getPmkPending(user, filter),
+    // getDispatchDue(user, filter, tables),
     getLifecycleDashboard(user, filter, tables),
   ]);
-
+  console.log("lifecycle : ",lifecycle);
+  
   return {
     role: user?.role_slug || "user",
     scope: isAdminRole(user?.role_slug) ? "admin" : "user",
     dashboardType: "order_management",
-    summary,
-    pipeline,
-    seriesMix,
-    monthlyOrders,
-    alerts,
-    recentOrders,
-    topProducts,
-    actionKpis,
-    bottleneckBoard,
-    productLoad,
-    criticalAlerts,
-    productionReadyTrend,
-    pmkPending,
-    dispatchDue,
     lifecycle,
-    meta: {
-      usesPlanningTable: tables.planning,
-      usesProductionTable: tables.production,
-      usesDispatchTables: tables.dispatch,
-      generatedAt: new Date().toISOString(),
-    },
+
+    // summary,
+    // pipeline,
+    // seriesMix,
+    // monthlyOrders,
+    // alerts,
+    // recentOrders,
+    // topProducts,
+    // actionKpis,
+    // bottleneckBoard,
+    // productLoad,
+    // criticalAlerts,
+    // productionReadyTrend,
+    // pmkPending,
+    // dispatchDue,
+    // meta: {
+    //   usesPlanningTable: tables.planning,
+    //   usesProductionTable: tables.production,
+    //   usesDispatchTables: tables.dispatch,
+    //   generatedAt: new Date().toISOString(),
+    // },
   };
 };
 

@@ -1,0 +1,898 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{{invoice.pi_no}} - Proforma Invoice</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      background: #5f666d;
+      color: #111827;
+      font-family: Arial, Helvetica, sans-serif;
+      font-size: 7.6px;
+      line-height: 1.12;
+    }
+
+    .pi-page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 10px auto;
+      padding: 8mm 8mm 7mm;
+      background: #fff;
+      box-shadow: 0 2px 10px rgba(0, 0, 0, .26);
+    }
+
+    .pi-full {
+      width: 100%;
+    }
+
+    .pi-half {
+      width: 50%;
+    }
+
+    .pi-w-medium {
+      width: 75% !important;
+    }
+
+    .pi-w-medium-m {
+      width: 70% !important;
+    }
+
+    .pi-w-small {
+      width: 25% !important;
+    }
+
+    .pi-w-small-m {
+      width: 30% !important;
+    }
+
+    .pi-border-none {
+      border: none !important;
+    }
+
+    .pi-border-t-none {
+      border-top: none !important;
+    }
+
+    .pi-border-b-none {
+      border-bottom: none !important;
+    }
+
+    .pi-border-l-none {
+      border-left: none !important;
+    }
+
+    .pi-border-r-none {
+      border-right: none !important;
+    }
+
+    .pi-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .pi-page table {
+      border-collapse: collapse;
+      border-spacing: 0;
+    }
+
+    .pi-page th,
+    .pi-page td {
+      border-color: #111827;
+      border-width: 1px;
+    }
+
+    /* Adjacent sections share one horizontal boundary. */
+    .pi-page > .pi-table + .pi-table:not(.pi-title) {
+      margin-top: -1px;
+    }
+
+    .pi-page > .pi-title + .pi-table {
+      margin-top: 0;
+    }
+
+    .pi-table th,
+    .pi-table td {
+      border: 1px solid #111827;
+      padding: 1.7px 3px;
+      vertical-align: top;
+      overflow-wrap: anywhere;
+    }
+
+    .pi-title th {
+      border: 0;
+      text-align: center;
+      font-size: 15px;
+      line-height: 1.05;
+      font-weight: 700;
+      letter-spacing: .03em;
+    }
+
+    .pi-label {
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .pi-small {
+      font-size: 6.5px;
+    }
+
+    .pi-medium {
+      font-size: 6.8px;
+    }
+
+    .pi-border-collapse {
+      border-collapse: collapse;
+    }
+
+    .pi-muted {
+      color: #374151;
+      font-size: 6.8px;
+      font-weight: 600;
+    }
+
+    .pi-center {
+      text-align: center;
+    }
+
+    .pi-right {
+      text-align: right;
+    }
+
+    .pi-left {
+      text-align: left !important;
+    }
+
+    .pi-upper {
+      text-transform: uppercase;
+    }
+
+    .pi-logo-cell {
+      width: 16%;
+      text-align: center;
+    }
+
+    .pi-logo {
+      width: 26mm;
+      max-height: 14mm;
+      object-fit: contain;
+      margin-top: 3px;
+    }
+
+    .pi-exporter-text {
+      width: 38%;
+    }
+
+    .pi-exporter-meta {
+      width: 16%;
+    }
+
+    .pi-header-right th {
+      width: 23%;
+      text-align: left;
+      font-size: 6.8px;
+    }
+
+    .pi-header-right td {
+      width: 25%;
+      font-size: 6.8px;
+    }
+
+    .pi-company-name {
+      font-size: 8.4px;
+      font-weight: 900;
+      text-transform: uppercase;
+    }
+
+    .pi-party-name {
+      font-size: 7px !important;
+      text-transform: uppercase;
+    }
+
+    .pi-party-title th {
+      text-align: left;
+      font-size: 7px;
+      background: #f8fafc;
+    }
+
+    .pi-party-cell {
+      height: 43mm;
+    }
+
+    .pi-info th {
+      width: 26%;
+      border: 0;
+      padding: 1.4px 2px;
+      text-align: left;
+      font-size: 6.8px;
+    }
+
+    .pi-info td {
+      width: 74%;
+      border: 0;
+      padding: 1.4px 2px;
+      font-size: 6.8px;
+    }
+
+
+    .pi-v-center {
+      vertical-align: middle !important;
+    }
+
+    .pi-items th {
+      height: 6mm;
+      vertical-align: middle;
+      text-align: center;
+      font-size: 6.2px;
+      line-height: 1.08;
+      font-weight: 700;
+      background: #f8fafc;
+    }
+
+    .pi-items .secondary-thead th {
+      height: 4mm !important;
+      font-size: 6px;
+    }
+
+    .pi-items td {
+      height: 6mm;
+      font-size: 6.6px;
+      vertical-align: middle !important;
+    }
+
+    .pi-items .pi-empty-row td {
+      height: 6mm;
+    }
+
+    .pi-summary th {
+      height: 4mm;
+      width: 40%;
+      text-align: left;
+      font-size: 6.8px;
+      vertical-align: middle !important;
+    }
+
+    .pi-summary td {
+      height: 4mm;
+      font-size: 6.8px;
+      vertical-align: middle !important;
+    }
+
+    .pi-bank {
+      border-collapse: collapse !important;
+    }
+
+    .pi-bank>tbody>tr>td {
+      border: 1px solid #111827;
+      height: auto;
+    }
+
+    .pi-bank-left {
+      width: 56%;
+    }
+
+    .pi-bank-right {
+      width: 44%;
+    }
+
+    .pi-bank-table {
+      border-collapse: collapse !important;
+      border: 0;
+    }
+
+    .pi-bank-table th {
+      width: 33%;
+      border: 1px solid black;
+      border-left: 0;
+      padding: .85px 2px;
+      text-align: left;
+      font-size: 6.7px;
+    }
+
+    .pi-bank-table td {
+      width: 67%;
+      border: 1px solid black;
+      border-right: 0;
+      padding: .85px 2px;
+      font-size: 6.7px;
+    }
+
+    .pi-bank-table tr:first-child > * {
+      border-top: 0;
+    }
+
+    .pi-bank-table tr:last-child > * {
+      border-bottom: 0;
+    }
+
+    .pi-words th {
+      border: 1px solid #111827;
+      border-left: 0;
+      border-right: 0;
+      text-align: left;
+      font-size: 6.8px;
+      padding: 1px 2px;
+      background: #f8fafc;
+    }
+
+    .pi-words td {
+      height: 10mm;
+      font-size: 6.7px;
+      font-weight: 700;
+      padding: 2px;
+      background: #f5f5f5;
+      border-left: 0;
+      border-right: 0;
+    }
+
+    .pi-words tr:first-child th {
+      border-top: 0;
+    }
+
+    .pi-words tr:last-child td {
+      border-bottom: 0;
+    }
+
+    .pi-note>tbody>tr>td {
+      height: 21mm;
+      font-size: 6.4px;
+      border: 1px solid #111827;
+      padding: 2px 3px;
+    }
+
+    .pi-sign>tbody>tr>td {
+      width: 50%;
+      height: 32mm;
+      font-size: 6.8px;
+      border: 1px solid #111827;
+      padding: 2px 3px;
+    }
+
+    .pi-sign-bottom {
+      margin-top: 18mm;
+      text-align: center;
+      font-weight: 900;
+    }
+
+    .pi-approval-table {
+      width: 100%;
+      margin-top: 12mm;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    .pi-approval-table td {
+      border: 0;
+      text-align: center;
+      vertical-align: bottom;
+      font-weight: 900;
+      height: 11mm;
+      padding: 0 2px;
+    }
+
+    .pi-cert-text {
+      padding-top: 12mm !important;
+      font-size: 6.4px !important;
+    }
+
+    .pi-for-sign {
+      padding-top: 6mm;
+      text-align: center;
+    }
+
+    .pi-padding {
+      padding: 1.4px 2px;
+    }
+
+    .pi-padding-x {
+      padding-left: 1.4px;
+      padding-right: 1.4px;
+    }
+
+    .pi-padding-y {
+      padding-top: 1.4px;
+      padding-bottom: 1.4px;
+    }
+
+    .pi-padding-none {
+      padding: 0 !important;
+    }
+
+    .pi-padding-none-x {
+      padding-top: 0 !important;
+      padding-bottom: 0 !important;
+    }
+
+    .pi-padding-none-y {
+      padding-left: 0 !important;
+      padding-right: 0 !important;
+    }
+
+    .pi-header-meta,
+    .pi-header-terms {
+      border-collapse: collapse;
+      border-spacing: 0;
+      margin: 0;
+    }
+
+    .pi-header-terms tr > :first-child {
+      border-left: 0;
+    }
+
+    .pi-header-terms tr > :last-child {
+      border-right: 0;
+    }
+
+    .pi-header-terms tr:last-child > * {
+      border-bottom: 0;
+    }
+
+    @page {
+      size: A4 portrait;
+      margin: 0;
+    }
+
+    @media screen {
+      html,
+      body {
+        background: #f1f5f9;
+      }
+
+      .pi-page {
+        zoom: 0.9;
+        transform: none;
+        margin: 16px auto;
+      }
+    }
+
+    @media screen and (max-width: 640px) {
+      .pi-page { zoom: 0.55; }
+    }
+
+    @media screen and (max-width: 440px) {
+      .pi-page { zoom: 0.38; }
+    }
+
+    @media print {
+
+      html,
+      body {
+        background: #fff;
+      }
+
+      .pi-page {
+        margin: 0;
+        box-shadow: none;
+        transform: none;
+        page-break-after: always;
+        break-after: page;
+      }
+
+      .pi-page:last-child {
+        page-break-after: auto;
+        break-after: auto;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <section class="pi-page">
+    <table class="pi-table pi-title">
+      <tr>
+        <th>PROFORMA INVOICE</th>
+      </tr>
+    </table>
+    {{!-- HEADER --}}
+    <table class="pi-table">
+      <tr>
+        <td class="pi-logo-cell" rowspan="7">
+          <div class="pi-label pi-left pi-padding">EXPORTER</div>
+          <img class="pi-logo" src="{{exporter.logo_url}}" alt="Sai Samrat">
+        </td>
+        <td class="pi-exporter-text" rowspan="7">
+          <div class="pi-company-name pi-padding">{{exporter.name}}</div>
+          <div class="pi-muted pi-padding">{{exporter.tagline}}</div>
+          <div class="pi-padding pi-medium">{{exporter.address_line1}}</div>
+          <div class="pi-padding pi-medium">{{exporter.address_line2}}</div>
+          <table class="pi-table pi-border-none">
+            <tr class="pi-border-none">
+              <td class="pi-half pi-border-none">
+                <div class="pi-padding-y pi-medium">An ISO 9001 &amp; 14001 Co. | CPRI Approved Products</div>
+                <div class="pi-padding-y pi-medium">Email: {{exporter.email}} | {{exporter.export_email}}</div>
+                <div class="pi-padding-y pi-medium">Call: {{exporter.phone}} Cell: {{exporter.mobile}}</div>
+              </td>
+              <td class="pi-half pi-border-none" rowspan="7">
+                <div class="pi-padding-y pi-medium">IEC CODE: {{exporter.iec_code}}</div>
+                <div class="pi-padding-y pi-medium">PAN NO.: {{exporter.pan}}</div>
+                <div class="pi-padding-y pi-medium">GST NO.: {{exporter.gst}}</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td class="pi-padding-none">
+          <table class="pi-border-none pi-full pi-header-meta">
+            <tbody class="pi-padding-none pi-w-full">
+              <tr class="pi-border-none">
+                <th class="pi-left pi-padding-none-y pi-medium pi-border-none pi-w-small-m" style="padding-left: 2px !important;" colspan="1">PROFORMA INVOICE
+                  NO.</th>
+                <td class="pi-border-none pi-padding-none-y pi-w-medium-m" >{{invoice.pi_no}}</td>
+              </tr>
+              <tr class="pi-header-right">
+                <th class="pi-left pi-padding-none-y pi-medium pi-border-none pi-small-m" style="padding-left: 2px !important;" colspan="1">PROFORMA INVOICE
+                  DATE</th>
+                <td class="pi-border-none pi-padding-none-y pi-medium-m">{{invoice.pi_date}}</td>
+              </tr>
+              <tr class="padding-none">
+                <td class="pi-border-none pi-padding-none" colspan="2">
+                  <table class="pi-border-collapse pi-border-none pi-full pi-header-terms">
+                    <tr class="pi-header-right">
+                      <th class="pi-w-small">Payment</th>
+                      <td class="pi-w-medium">{{terms.payment}}</td>
+                    </tr>
+                    <tr class="pi-header-right">
+                      <th>Delivery</th>
+                      <td>{{terms.delivery}}</td>
+                    </tr>
+                    <tr class="pi-header-right">
+                      <th>Delivery Terms</th>
+                      <td>{{terms.delivery_terms}}</td>
+                    </tr>
+                    <tr class="pi-header-right">
+                      <th>Packing</th>
+                      <td>{{terms.packing}}</td>
+                    </tr>
+                    <tr class="pi-header-right">
+                      <th>Validity of Offer</th>
+                      <td>{{terms.validity}}</td>
+                    </tr>
+                    <tr class="pi-header-right">
+                      <th>Other Term</th>
+                      <td>{{terms.other_term}}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </td>
+      </tr>
+    </table>
+    {{!-- DETAILS --}}
+    <table class="pi-table">
+      <tr class="pi-party-title pi-border-b-none">
+        <th class="pi-border-b-none">IMPORTER NAME AND ADDRESS</th>
+        <th class="pi-border-b-none">CONSIGNEE</th>
+      </tr>
+      <tr>
+        <td class="pi-party-cell pi-border-t-none">
+          <table class="pi-info pi-table">
+            <tr>
+              <th class="pi-party-name">FULL NAME:</th>
+              <td class="pi-party-name">{{customer.name}}</td>
+            </tr>
+            <tr>
+              <th>ADDRESS:</th>
+              <td>{{customer.address}}</td>
+            </tr>
+            <tr>
+              <th>COUNTRY</th>
+              <td>{{customer.country}}</td>
+            </tr>
+            <tr>
+              <th>Email ID:</th>
+              <td>{{customer.email}}</td>
+            </tr>
+            <tr>
+              <th>Posta Code</th>
+              <td>{{customer.postal_code}}</td>
+            </tr>
+            <tr>
+              <th>TELEPHONE:</th>
+              <td>{{customer.mobile}}</td>
+            </tr>
+            <tr>
+              <th>VAT NO</th>
+              <td>{{customer.vat_no}}</td>
+            </tr>
+            <tr>
+              <th>REGISTRATION NO.:</th>
+              <td>-</td>
+            </tr>
+            <tr>
+              <th>COUNTRY OF ORIGIN</th>
+              <td>{{shipment.country_of_origin}}</td>
+            </tr>
+            <tr>
+              <th>PORT OF LOADING</th>
+              <td>{{shipment.port_of_loading}}</td>
+            </tr>
+            <tr>
+              <th>COUNTRY OF EXPORT</th>
+              <td>{{shipment.country_of_export}}</td>
+            </tr>
+            <tr>
+              <th>PORT OF DISCHARGE</th>
+              <td>{{shipment.port_of_discharge}}</td>
+            </tr>
+            <tr>
+              <th>FINAL DESTINATION</th>
+              <td>{{shipment.final_destination}}</td>
+            </tr>
+          </table>
+        </td>
+        <td class="pi-party-cell pi-border-t-none">
+          <table class="pi-info pi-table">
+            <tr>
+              <th class="pi-party-name">FULL NAME:</th>
+              <td class="pi-party-name">{{consignee.name}}</td>
+            </tr>
+            <tr>
+              <th>ADDRESS:</th>
+              <td>{{consignee.address}}</td>
+            </tr>
+            <tr>
+              <th>COUNTRY</th>
+              <td>{{consignee.country}}</td>
+            </tr>
+            <tr>
+              <th>Email ID:</th>
+              <td>{{consignee.email}}</td>
+            </tr>
+            <tr>
+              <th>Posta Code</th>
+              <td>{{consignee.postal_code}}</td>
+            </tr>
+            <tr>
+              <th>TELEPHONE:</th>
+              <td>{{consignee.mobile}}</td>
+            </tr>
+            <tr>
+              <th>VAT NO</th>
+              <td>{{consignee.vat_no}}</td>
+            </tr>
+            <tr>
+              <th>REGISTRATION NO.:</th>
+              <td>-</td>
+            </tr>
+            <tr>
+              <th>COUNTRY OF ORIGIN</th>
+              <td>{{shipment.country_of_origin}}</td>
+            </tr>
+            <tr>
+              <th>PORT OF LOADING</th>
+              <td>{{shipment.port_of_loading}}</td>
+            </tr>
+            <tr>
+              <th>COUNTRY OF EXPORT</th>
+              <td>{{shipment.country_of_export}}</td>
+            </tr>
+            <tr>
+              <th>PORT OF DISCHARGE</th>
+              <td>{{shipment.port_of_discharge}}</td>
+            </tr>
+            <tr>
+              <th>FINAL DESTINATION</th>
+              <td>{{shipment.final_destination}}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    {{!-- ITEMS --}}
+    <table class="pi-table pi-items">
+      <thead>
+        <tr>
+          <th style="width:6%">Sr. No</th>
+          <th style="width:9%">Brand</th>
+          <th style="width:7%">MODEL<br>CODE</th>
+          <th style="width:17%" class="pi-left">SAIPL FG CODE</th>
+          <th style="width:20%" class="pi-left">PRODUCT MARKING REQUIRED BY CUSTOMER</th>
+          <th style="width:8%">HSN CODE</th>
+          <th style="width:7%">Unit Weight<br>(+/- 2 kg)</th>
+          <th style="width:8%">ORDER QTY</th>
+          <th style="width:7%">UNIT OF<br>MEASURE</th>
+          <th style="width:7%">RATE PER UNIT</th>
+          <th style="width:9%">TOTAL VALUE</th>
+        </tr>
+        <tr class="secondary-thead">
+          <th style="width:6%"></th>
+          <th style="width:9%"></th>
+          <th style="width:7%"></th>
+          <th class="pi-left" style="width:17%"></th>
+          <th class="pi-left" style="width:20%"></th>
+          <th style="width:8%"></th>
+          <th style="width:7%"></th>
+          <th style="width:8%"></th>
+          <th style="width:7%">pieces / units / set etc</th>
+          <th style="width:7%">{{invoice.currency}}</th>
+          <th style="width:9%">{{invoice.currency}}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{#each items}}
+        <tr>
+          <td class="pi-center">{{sr_no}}</td>
+          <td class="pi-center pi-upper">{{brand}}</td>
+          <td class="pi-center">{{model_code}}</td>
+          <td>{{fg_code}}<br>({{description}})</td>
+          <td>{{marking}}</td>
+          <td class="pi-center">{{hsn_code}}</td>
+          <td class="pi-right">{{weight}}</td>
+          <td class="pi-right">{{qty}}</td>
+          <td class="pi-center">{{unit}}</td>
+          <td class="pi-right">{{../invoice.currency_symbol}} {{rate}}</td>
+          <td class="pi-right">{{../invoice.currency_symbol}} {{line_value}}</td>
+        </tr>
+        {{/each}}
+        {{#each blankRows}}<tr class="pi-empty-row">
+          <td>&nbsp;</td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+          <td></td>
+        </tr>{{/each}}
+
+        {{!-- SUMMARY --}}
+        <tr class="pi-summary">
+          <td colspan="4"></td>
+          <th colspan="2" class="pi-left">Number of Containers</th>
+          <td colspan="2" class="pi-right" style="width:14%">{{summary.containers}}</td>
+          <th colspan="2" class="pi-left" style="width:19%">INVOICE VALUE TOTAL</th>
+          <td class="pi-right" style="width:12%">{{invoice.currency_symbol}} {{summary.invoice_total}}</td>
+        </tr>
+        <tr class="pi-summary">
+          <td colspan="4"></td>
+          <th colspan="2" class="pi-left">Total Qty as per Proforma Invoice</th>
+          <td colspan="2" class="pi-right">{{summary.total_qty}}</td>
+          <th colspan="2" class="pi-left">Insurance</th>
+          <td class="pi-right">{{summary.insurance}}</td>
+        </tr>
+        <tr class="pi-summary">
+          <td colspan="4"></td>
+          <th colspan="2" class="pi-left">Total Consignment Weight as per Proforma Invoice</th>
+          <td colspan="2" class="pi-right">{{summary.net_weight}}</td>
+          <th colspan="2" class="pi-left">Freight</th>
+          <td class="pi-right">{{summary.freight}}</td>
+        </tr>
+        <tr class="pi-summary">
+          <td colspan="4"></td>
+          <th colspan="2" class="pi-left">Total consignment Weight as per Proforma Invoice</th>
+          <td colspan="2" class="pi-right">{{summary.gross_weight}}</td>
+          <th colspan="2" class="pi-left">Less Advance Received</th>
+          <td class="pi-right">{{summary.advance_received}}</td>
+        </tr>
+        <tr class="pi-summary">
+          <td colspan="8"></td>
+          <th colspan="2" class="pi-left">Total PI Value</th>
+          <td class="pi-right">{{invoice.currency_symbol}} {{summary.pi_total}}</td>
+        </tr>
+      </tbody>
+    </table>
+    <table class="pi-table pi-bank">
+      <tr class="pi-bank">
+        <td style="width: 59%;" class="pi-bank-left pi-padding-none">
+          <table class="pi-table pi-border-collapse pi-bank-table">
+            <colgroup><col style="width:31%"><col style="width:69%"></colgroup>
+            <tr class="pi-border-collapse">
+              <th class="pi-left pi-border-none" colspan="2">
+                <div class="pi-label">BANK DETAILS</div>
+              </th>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left" style="width: 31%;">PLEASE TRANSFER FUNDS TO</th>
+              <td>{{bank.transfer_to}}</td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">BENEFICIARY DETAILS</th>
+              <td></td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">ACCOUNT NO</th>
+              <td>{{bank.account_no}}</td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">NAME</th>
+              <td>{{bank.name}}</td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">ACCOUNT MAINTAINED WITH</th>
+              <td>{{bank.bank_name}}</td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">SWIFT CODE</th>
+              <td>{{bank.swift_code}}</td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">FOR FURTHER CREDIT TO</th>
+              <td></td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">Currency</th>
+              <td>{{invoice.currency}}</td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">Correspondent Bank</th>
+              <td>{{bank.correspondent_bank}}</td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">ACCOUNT NUMBER</th>
+              <td>{{bank.correspondent_account}}</td>
+            </tr>
+            <tr class="pi-border-collapse">
+              <th class="pi-left">Swift Code</th>
+              <td>{{bank.correspondent_swift}}</td>
+            </tr>
+          </table>
+        </td>
+        <td class="pi-bank-right pi-padding-none border-none" style="width: 46%;">
+          <table class="pi-words pi-table">
+            <tr>
+              <th>PI AMOUNT IN WORD:</th>
+            </tr>
+            <tr>
+              <td>{{summary.amount_in_words}}</td>
+            </tr>
+            <tr>
+              <th>Special Remarks :</th>
+            </tr>
+            <tr>
+              <td>{{invoice.remarks}}</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+    <table class="pi-table pi-note">
+      <tr>
+        <td style="width:58%">
+          <div class="pi-label">Note</div>
+          <div>- PRODUCT DESCRIPTIONS ON BATTERY IS MENTIONED AS PER CUSTOMER REQUIREMENT, IT MAY OR MAY NOT VARY THAN
+            THE ACTUAL BATTERY DESCRIPTION.</div>
+          <div>- FREIGHT WILL BE APPLIED AT ACTUAL AT THE TIME OF DISPATCH</div>
+          <div>- SAIPL WILL NOT BE HELD RESPONSIBLE FOR ANY EXTRA CHARGES, DETENTION OR FINES APPLIED BY SHIPPING LINE.
+          </div>
+        </td>
+        <td class="pi-cert-text" style="width:42%">I hereby certify that this invoice shows the actual price of goods described, that no
+          other invoice has been issued, and that all particulars are true and correct.</td>
+      </tr>
+    </table>
+    <table class="pi-table pi-sign">
+      <tr>
+        <td>
+          <div>Accepted by: {{customer.name}}</div>
+          <div>Name:</div>
+          <div>Designation:</div>
+          <div>Date:</div>
+          <div class="pi-sign-bottom">Sign &amp; Stamp</div>
+        </td>
+        <td>
+          <div class="pi-for-sign">For {{exporter.name}}</div>
+          <table class="pi-approval-table">
+            <tr>
+              <td>CHECKED BY</td>
+              <td>APPROVED BY</td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </section>
+</body>
+
+</html>

@@ -1,0 +1,335 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>{{code}} - Production Note</title>
+    <style>
+        * {
+            box-sizing: border-box
+        }
+
+        body {
+            margin: 0;
+            font: 10px Arial, sans-serif;
+            color: #111;
+            background: #f1f5f9
+        }
+
+        .pi-page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 10mm 9mm;
+            background: white;
+            margin: 16px auto
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            border-spacing: 0;
+            table-layout: fixed
+        }
+
+        th,
+        td {
+            border: 1px solid #222;
+            padding: 4px;
+            vertical-align: middle;
+            overflow-wrap: anywhere
+        }
+
+        .heading {
+            background: #262626;
+            color: white;
+            font: bold 20px Georgia, serif;
+            text-align: center;
+            padding: 7px;
+            border: 1px solid #222
+        }
+
+        .intro {
+            border: 1px solid #222;
+            border-top: 0;
+            padding: 10px 5px 12px
+        }
+
+        .intro table td {
+            border: 0;
+            padding: 3px
+        }
+
+        .label {
+            width: 19%
+        }
+
+        .code {
+            font: bold 25px small-caption
+        }
+
+        .intro p {
+            margin: 14px 0 0;
+            line-height: 1.6
+        }
+
+        .items th {
+            height: 12mm;
+            font-weight: normal
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .text-left {
+            text-align: left;
+        }
+
+        .border-b-none {
+            border-bottom: none;
+        }
+
+        .border-r-none {
+            border-right: none;
+        }
+
+        .items td {
+            height: 8mm
+        }
+
+        .center {
+            text-align: center
+        }
+
+        .right {
+            text-align: right
+        }
+
+        .items .summary td {
+            height: 5mm
+        }
+
+        .packing {
+            border: 1px solid #222;
+            border-top: 0;
+            padding: 10px 0 0
+        }
+
+        .packing table {
+            width: 94%;
+            margin-left: 6%
+        }
+
+        .packing th {
+            height: 10mm;
+            font-weight: normal
+        }
+
+        .packing td {
+            height: 11mm;
+            text-align: center
+        }
+
+        .additional {
+            display: flex;
+            min-height: 32mm
+        }
+
+        .additional span {
+            width: 6%;
+            padding: 10px 2px;
+            font-size: 9px
+        }
+
+        .additional div {
+            width: 94%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border-left: 1px solid #222;
+            border-bottom: 1px solid #222
+        }
+
+        .sign td {
+            height: 30mm;
+            text-align: center;
+            vertical-align: bottom
+        }
+
+        .sign {
+            margin-top: -1px
+        }
+
+        .printed {
+            font-size: 8px;
+            border: 1px solid #222;
+            border-top: 0;
+            padding: 2px 5px
+        }
+
+        @page {
+            size: A4;
+            margin: 0
+        }
+
+        @media screen {
+            .pi-page {
+                zoom: .9
+            }
+        }
+
+        @media screen and (max-width:640px) {
+            .pi-page {
+                zoom: .5
+            }
+        }
+
+        @media print {
+            body {
+                background: white
+            }
+
+            .pi-page {
+                margin: 0;
+                zoom: 1
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <section class="pi-page">
+        <div class="heading">PRODUCTION NOTE</div>
+        <div class="intro">
+            <table>
+                <tr>
+                    <td class="label">Production Note No.</td>
+                    <td>{{number}}</td>
+                    <td style="width:18%">Production Code</td>
+                    <td class="code" style="width:17%">{{code}}</td>
+                </tr>
+                <tr>
+                    <td>Production Note Dated</td>
+                    <td>{{date}}</td>
+                    <td>PI No.</td>
+                    <td>{{pi}}</td>
+                </tr>
+                <tr>
+                    <td>Client</td>
+                    <td>{{customer}}</td>
+                    <td>Dated</td>
+                    <td>{{piDate}}</td>
+                </tr>
+                <tr>
+                    <td>Port of Dis</td>
+                    <td>{{port}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+                <tr>
+                    <td>Country</td>
+                    <td>{{country}}</td>
+                    <td></td>
+                    <td></td>
+                </tr>
+            </table>
+            <p>Dear Production Team,<br>Here we confirm following Order as Proforma Reference, kindly take production
+                and confirm us the dispatch schedule which we can communicate with client for dispatch activity.</p>
+        </div>
+        <table class="items" style="margin-top:-1px">
+            <colgroup>
+                <col style="width:6%">
+                <col style="width:11%">
+                <col style="width:8%">
+                <col style="width:23%">
+                <col style="width:8%">
+                <col style="width:22%">
+                <col style="width:9%">
+                <col style="width:13%">
+            </colgroup>
+            <thead>
+                <tr>
+                    <th>Sr. No</th>
+                    <th>Brand</th>
+                    <th>Part No.</th>
+                    <th>SAI FG Code</th>
+                    <th>Minimum Unit Weight</th>
+                    <th>Product Marking on Battery as per Customer Requirement</th>
+                    <th>ORDER QTY in Nos</th>
+                    <th>Remarks</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{#each items}}<tr>
+                    <td class="center">{{sr}}</td>
+                    <td class="center">{{brand}}</td>
+                    <td class="center">{{code}}</td>
+                    <td>{{fg}}<br>({{description}})</td>
+                    <td class="right">{{weight}}</td>
+                    <td>{{marking}}</td>
+                    <td class="right">{{qty}}</td>
+                    <td>{{remarks}}</td>
+                </tr>{{/each}}
+                {{#each blanks}}<tr>
+                    <td>&nbsp;</td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>{{/each}}
+                <tr class="summary">
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td class="text-right" colspan="3" style="border-left: none;">Total Consignment Qty in Nos</td>
+                    <td class="right">{{qty}}</td>
+                    <td></td>
+                </tr>
+                <tr class="summary">
+                    <td class="border-b-none" colspan="2" rowspan="2"></td>
+                    <td colspan="4">Total Packed Battery Weight as per Proforma Invoice</td>
+                    <td class="right">{{weight}}</td>
+                    <td>Kgs</td>
+                </tr>
+                <tr class="summary">
+                    <td colspan="4">Total Consignment Weight as per Proforma Invoice</td>
+                    <td class="right">-</td>
+                    <td>Kgs</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="packing">
+            <table>
+                <tr>
+                    <th>Container Colour</th>
+                    <th>Lid Colour</th>
+                    <th>Box</th>
+                    <th class="border-r-none">Screen Colour</th>
+                </tr>
+                <tr>
+                    <td>{{packing.container}}</td>
+                    <td>{{packing.lid}}</td>
+                    <td>{{packing.box}}</td>
+                    <td class="border-r-none">{{packing.screen}}</td>
+                </tr>
+            </table>
+            <div class="additional"><span>Additional Note</span>
+                <div>{{remarks}}</div>
+            </div>
+        </div>
+        <table class="sign">
+            <tr>
+                <td>Issue By<br>Mr. Silvi</td>
+                <td>Accepted By PRQ Packing Department<br>Mr. Ganesh Sangale</td>
+                <td>Accepted By PRD</td>
+                <td>Verified by<br>Mr. Shemule</td>
+                <td>Authorised By<br>Mr. Nilesh Chavan</td>
+            </tr>
+        </table>
+        <div class="printed">Note Printed on {{printed}}</div>
+    </section>
+</body>
+
+</html>

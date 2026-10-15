@@ -102,6 +102,7 @@ export const normalizePayload = async (body = {}, user = {}) => {
 
       return {
         product_id: productId,
+        pi_item_id: item.pi_item_id ? Number(item.pi_item_id) : null,
         product_code_snapshot: firstValidString(item.product_code_snapshot, item.productCode, item.product_code),
         product_name_snapshot: firstValidString(item.product_name_snapshot, item.product, item.product_name, item.name),
         brand_snapshot: firstValidString(item.brand_snapshot, item.model, item.series, item.brand),
@@ -131,6 +132,7 @@ export const normalizePayload = async (body = {}, user = {}) => {
     order_date: orderDate,
     order_type: order.order_type,
     pi_number: order.pi_number,
+    pi_id: order.pi_id ? Number(order.pi_id) : null,
     order_month: orderMonth,
     order_week: firstValidString(order.order_week),
     expected_delivery_date: firstValidString(order.expected_delivery_date),

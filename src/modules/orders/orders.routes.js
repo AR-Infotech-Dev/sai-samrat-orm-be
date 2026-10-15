@@ -1,5 +1,7 @@
+import * as piController from "./proforma-invoice/proforma-invoice.controller.js";
 import express from "express";
 import * as bookingController from "./booking/booking.controller.js";
+import { productionNote } from "./booking/production-note.controller.js";
 import * as confirmationController from "./confirmation/confirmation.controller.js";
 import * as planningController from "./planning/planning.controller.js";
 import * as productionController from "./production/production.controller.js";
@@ -8,6 +10,17 @@ import * as dispatchController from "./dispatch/dispatch.controller.js";
 import { requirePermission } from "#middlewares/permissions.middleware.js";
 
 const ordersRoutes = express.Router();
+
+
+ordersRoutes.post("/proforma-invoice", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.list);
+ordersRoutes.post("/proforma-invoice/active-list", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.activeList);
+ordersRoutes.get("/proforma-invoice/:id/items", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.getItems);
+ordersRoutes.get("/proforma-invoice/:id/preview", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.preview);
+ordersRoutes.get("/proforma-invoice/:id/pdf", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.preview);
+ordersRoutes.post("/proforma-invoice/delete", requirePermission(["proforma-invoice", "order-booking"], "delete"), piController.changeStatus);
+ordersRoutes.put("/proforma-invoice/create", requirePermission(["proforma-invoice", "order-booking"], "create"), piController.getDetails);
+ordersRoutes.get("/proforma-invoice/:id", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.getDetails);
+ordersRoutes.post("/proforma-invoice/:id", requirePermission(["proforma-invoice", "order-booking"], "edit"), piController.getDetails);
 
 ordersRoutes.post("/confirmation", requirePermission(["order-confirmation"], "view"), confirmationController.list);
 ordersRoutes.get("/confirmation/:id", requirePermission(["order-confirmation"], "view"), confirmationController.details);
@@ -40,6 +53,8 @@ ordersRoutes.post("/", requirePermission(["order-booking"], "view"), bookingCont
 ordersRoutes.post("/delete", requirePermission(["order-booking"], "delete"), bookingController.changeStatus);
 ordersRoutes.put("/create", requirePermission(["order-booking"], "create"), bookingController.getOrderDetails);
 ordersRoutes.get("/:id/preview",requirePermission(["order-booking"], "view"),bookingController.preview);
+ordersRoutes.get("/:id/production-note/preview", requirePermission(["order-booking"], "view"), productionNote);
+ordersRoutes.get("/:id/production-note/pdf", requirePermission(["order-booking"], "view"), productionNote);
 ordersRoutes.get("/:id", requirePermission(["order-booking"], "view"), bookingController.getOrderDetails);
 ordersRoutes.post("/:id", requirePermission(["order-booking"], "edit"), bookingController.getOrderDetails);
 

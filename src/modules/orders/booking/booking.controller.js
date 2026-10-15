@@ -64,6 +64,7 @@ export const orderValidationRules = {
   customer_id: { label: "Customer", type: "number", required: true },
   brand: { label: "Brand" },
   pi_number: { label: "PI number" },
+  pi_id: { label: "PI ID", type: "number" },
   order_date: { label: "Order Date", required: true },
   order_type: { label: "Order Type", required: true },
   order_month: { label: "Order Month" },
@@ -88,6 +89,19 @@ const saveOrderItems = async ({ orderId, companyId, userId, items }) => {
   await CommonModel.deleteMasterDetails({ table: ORDERS_LINE_TABLE, where: { order_id: orderId } });
 
   for (const item of items) {
+    // update pi_item booked_qty
+    if (item.pi_item_id) {
+      await query(
+        `UPDATE ${DB_PREFIX}proforma_invoice_items 
+         SET booked_qty = (
+           SELECT COALESCE(SUM(order_qty), 0) + ? 
+           FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} 
+           WHERE pi_item_id = ? AND status <> 'delete' AND order_id <> ?
+         ) 
+         WHERE pi_item_id = ?`,
+        [Number(item.order_qty || 0), item.pi_item_id, orderId, item.pi_item_id]
+      );
+    }
     await CommonModel.saveMasterDetails({
       table: ORDERS_LINE_TABLE,
       data: {
@@ -100,6 +114,43 @@ const saveOrderItems = async ({ orderId, companyId, userId, items }) => {
       },
     });
   }
+};
+
+const validatePiItemAvailability = async ({ orderId = 0, items = [] }) => {
+  const piItemTotals = new Map();
+  items.forEach((item) => {
+    if (!item.pi_item_id) return;
+    const key = Number(item.pi_item_id);
+    piItemTotals.set(key, (piItemTotals.get(key) || 0) + Number(item.order_qty || 0));
+  });
+
+  for (const [piItemId, requestedQty] of piItemTotals.entries()) {
+    const rows = await query(
+      `SELECT pii.qty,
+              COALESCE((
+                SELECT SUM(oi.order_qty)
+                FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
+                WHERE oi.pi_item_id = pii.pi_item_id
+                  AND oi.status <> 'delete'
+                  AND oi.order_id <> ?
+              ), 0) AS other_booked_qty
+       FROM ${DB_PREFIX}proforma_invoice_items pii
+       WHERE pii.pi_item_id = ? AND pii.status <> 'delete'
+       LIMIT 1`,
+      [orderId || 0, piItemId]
+    );
+
+    if (!rows.length) {
+      return "Selected PI item not found";
+    }
+
+    const availableQty = Number(rows[0].qty || 0) - Number(rows[0].other_booked_qty || 0);
+    if (requestedQty > availableQty) {
+      return `PI remaining qty is ${availableQty}. Please enter ${availableQty} or less.`;
+    }
+  }
+
+  return "";
 };
 
 export const list = async (req, res) => {
@@ -189,6 +240,10 @@ export const getOrderDetails = async (req, res) => {
         if (payloadError) {
           return failureResponse(res, { code: 2001, httpStatus: 400, message: payloadError });
         }
+        const piItemError = await validatePiItemAvailability({ orderId: 0, items });
+        if (piItemError) {
+          return failureResponse(res, { code: 2001, httpStatus: 400, message: piItemError });
+        }
 
         const data = { ...order };
         delete data.order_id;
@@ -215,6 +270,10 @@ export const getOrderDetails = async (req, res) => {
         const payloadError = validateOrderPayload(order, items);
         if (payloadError) {
           return failureResponse(res, { code: 2001, httpStatus: 400, message: payloadError });
+        }
+        const piItemError = await validatePiItemAvailability({ orderId: order_id, items });
+        if (piItemError) {
+          return failureResponse(res, { code: 2001, httpStatus: 400, message: piItemError });
         }
 
         const where = { order_id };
