@@ -171,7 +171,7 @@ export const getFreeTextSearch = async (req, res) => {
       `;
       join.push({ type: "LEFT JOIN", table: "customer", alias: "cu", key1: "customer_id", key2: "customer_id" });
       where.push("t.status <> 'delete'");
-      where.push("t.pi_status NOT IN ('cancelled', 'converted')");
+      where.push("t.pi_status = 'approved'");
       where.push(`EXISTS (
         SELECT 1 FROM ${DB_PREFIX}proforma_invoice_items pii
         WHERE pii.pi_id = t.pi_id AND pii.status <> 'delete' AND pii.qty > pii.booked_qty

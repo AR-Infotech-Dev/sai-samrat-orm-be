@@ -6,6 +6,7 @@ import { toMysqlDateTime } from "#shared/utils/dateTime.js";
 import { env } from "#config/env.js";
 import { renderTemplate } from "#shared/utils/templateMaker.js";
 import { renderProformaPdf } from "./proforma-pdf.service.js";
+import { withPiWriteLock } from "./pi-lifecycle.model.js";
 
 const MODULE_TABLE = "proforma_invoices";
 const PI_ITEMS_TABLE = "proforma_invoice_items";
@@ -102,7 +103,7 @@ const custom_columns = {
     alias: "ct",
     column: "categoryName",
     key2: "slug",
-    select: "ct.cat_color as pi_status_color",
+    select: "ct.cat_color as pi_status_color, t.pi_status AS pi_status_code",
   },
   priority: {
     table: "categories",
@@ -266,6 +267,15 @@ export const getItems = async (req, res) => {
 
 export const getDetails = async (req, res) => {
   try {
+    if (req.method.toUpperCase() === "POST") return await withPiWriteLock(req.params.id, () => getDetailsInternal(req, res));
+    return await getDetailsInternal(req, res);
+  } catch (error) {
+    return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
+  }
+};
+
+const getDetailsInternal = async (req, res) => {
+  try {
     const method = req.method.toUpperCase();
     const { id: pi_id = null } = req.params;
     const userId = req.user?.adminID || 1;
@@ -313,7 +323,7 @@ export const getDetails = async (req, res) => {
           pi_date: piData.pi_date || toMysqlDateTime().slice(0, 10),
           valid_until: piData.valid_until || null,
           order_type: piData.order_type || "domestic",
-          pi_status: piData.pi_status || "draft",
+          pi_status: piData.pi_status === "waiting" ? "waiting" : "draft",
           priority: piData.priority || "normal",
           total_qty: totalQty,
           total_value: totalValue,
@@ -380,6 +390,10 @@ export const getDetails = async (req, res) => {
           return failureResponse(res, { code: 2004, httpStatus: 404, message: "PI ID not found" });
         }
 
+        const currentPi = await query(`SELECT pi_status FROM ${DB_PREFIX}${MODULE_TABLE} WHERE pi_id = ? AND status <> 'delete'`, [pi_id]);
+        if (!currentPi.length) return failureResponse(res, { code: 2004, httpStatus: 404, message: "PI not found" });
+        if (currentPi[0].pi_status !== "draft") return failureResponse(res, { code: 2001, httpStatus: 409, message: "Only Draft PIs can be updated" });
+
         const payload = req.body || {};
         const piData = payload.proforma || payload.pi || payload;
         const items = Array.isArray(payload.items) ? payload.items : [];
@@ -413,7 +427,7 @@ export const getDetails = async (req, res) => {
           pi_date: piData.pi_date,
           valid_until: piData.valid_until || null,
           order_type: piData.order_type || "domestic",
-          pi_status: piData.pi_status || "draft",
+          pi_status: piData.pi_status === "waiting" ? "waiting" : "draft",
           priority: piData.priority || "normal",
           total_qty: totalQty,
           total_value: totalValue,
@@ -561,9 +575,11 @@ export const preview = async (req, res) => {
               cu.gst_number AS customer_gst_number,
               cu.country AS customer_country,
               cu.postal_code AS customer_postal_code,
+              au.name AS approved_by_name,
               cu.vat_no AS customer_vat_no
        FROM ${DB_PREFIX}${MODULE_TABLE} pi
        LEFT JOIN ${DB_PREFIX}customer cu ON pi.customer_id = cu.customer_id
+       LEFT JOIN ${DB_PREFIX}admin au ON pi.approved_by = au.adminID
        WHERE pi.pi_id = ? AND pi.status <> 'delete'`,
       [pi_id]
     );
@@ -619,6 +635,7 @@ export const preview = async (req, res) => {
         currency,
         currency_symbol: currencySymbol,
         remarks: pi.remarks || "-",
+        approved_by: pi.approved_by_name || "-",
       },
       customer: {
         name: pi.customer_company_name || pi.customer_name || "-",

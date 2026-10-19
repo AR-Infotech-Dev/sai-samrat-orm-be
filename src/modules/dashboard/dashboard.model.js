@@ -2,10 +2,10 @@ import * as CommonModel from "#shared/models/common.model.js";
 import { query, DB_PREFIX } from "#config/database.js";
 import { isAdminRole } from "#shared/utils/role.utils.js";
 
-const ORDER_TABLE = "orders";
-const ORDER_ITEMS_TABLE = "order_items";
-const PLANNING_TABLE = "order_item_planning";
-const PRODUCTION_TABLE = "order_item_production";
+const ORDER_TABLE = "production_notes";
+const ORDER_ITEMS_TABLE = "production_note_items";
+const PLANNING_TABLE = "production_note_item_planning";
+const PRODUCTION_TABLE = "production_note_item_production";
 const DISPATCH_TABLE = "dispatches";
 const DISPATCH_ITEMS_TABLE = "dispatch_items";
 
@@ -57,20 +57,20 @@ const addCompanyScope = () => { };
 const addOrderDateScope = (where, params, filter = {}, alias = "o") => {
   const { fromDate, toDate } = getDateFilter(filter);
   if (fromDate) {
-    where.push(`DATE(${alias}.order_date) >= ?`);
+    where.push(`DATE(${alias}.production_note_date) >= ?`);
     params.push(fromDate);
   }
   if (toDate) {
-    where.push(`DATE(${alias}.order_date) <= ?`);
+    where.push(`DATE(${alias}.production_note_date) <= ?`);
     params.push(toDate);
   }
 };
 
 const addDashboardFilterScope = (where, params, filter = {}, alias = "o") => {
-  const orderId = getFilterValue(filter, "order_id", "orderId");
+  const orderId = getFilterValue(filter, "production_note_id", "orderId");
   const customerId = getFilterValue(filter, "customer_id", "customerId");
   const productId = getFilterValue(filter, "product_id", "productId");
-  const orderStatus = getFilterValue(filter, "order_status", "status");
+  const orderStatus = getFilterValue(filter, "production_note_status", "status");
   const stage = getFilterValue(filter, "stage");
   const normalizedStage = String(stage || "").toLowerCase();
   const normalizedOrderStatus = String(orderStatus || "").toLowerCase();
@@ -79,7 +79,7 @@ const addDashboardFilterScope = (where, params, filter = {}, alias = "o") => {
     : "";
 
   if (orderId) {
-    where.push(`${alias}.order_id = ?`);
+    where.push(`${alias}.production_note_id = ?`);
     params.push(orderId);
   }
   if (customerId) {
@@ -87,19 +87,19 @@ const addDashboardFilterScope = (where, params, filter = {}, alias = "o") => {
     params.push(customerId);
   }
   if (normalizedOrderStatus && normalizedOrderStatus !== "all") {
-    where.push(`LOWER(COALESCE(${alias}.order_status, '')) = ?`);
+    where.push(`LOWER(COALESCE(${alias}.production_note_status, '')) = ?`);
     params.push(normalizedOrderStatus);
   } else if (statusFromStage) {
-    where.push(`LOWER(COALESCE(${alias}.order_status, '')) = ?`);
+    where.push(`LOWER(COALESCE(${alias}.production_note_status, '')) = ?`);
     params.push(statusFromStage);
   }
   if (normalizedStage === "overdue") {
     where.push(`${alias}.expected_delivery_date IS NOT NULL`);
     where.push(`DATE(${alias}.expected_delivery_date) < CURDATE()`);
-    where.push(`LOWER(COALESCE(${alias}.order_status, '')) NOT IN ('completed','cancelled')`);
+    where.push(`LOWER(COALESCE(${alias}.production_note_status, '')) NOT IN ('completed','cancelled')`);
   }
   if (productId) {
-    where.push(`EXISTS (SELECT 1 FROM ${DB_PREFIX}${ORDER_ITEMS_TABLE} f_oi WHERE f_oi.order_id = ${alias}.order_id AND f_oi.status <> 'delete' AND f_oi.product_id = ?)`);
+    where.push(`EXISTS (SELECT 1 FROM ${DB_PREFIX}${ORDER_ITEMS_TABLE} f_oi WHERE f_oi.production_note_id = ${alias}.production_note_id AND f_oi.status <> 'delete' AND f_oi.product_id = ?)`);
     params.push(productId);
   }
 };
@@ -144,16 +144,16 @@ const getAvailableTables = async () => ({
 });
 
 const getJoinSql = ({ planning, production, dispatch }) => ({
-  planningJoin: planning ? `LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'` : "",
-  productionJoin: production ? `LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.order_item_id = pr.order_item_id AND pr.status <> 'delete'` : "",
+  planningJoin: planning ? `LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'` : "",
+  productionJoin: production ? `LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.production_note_item_id = pr.production_note_item_id AND pr.status <> 'delete'` : "",
   dispatchJoin: dispatch
     ? `LEFT JOIN (
-        SELECT di.order_item_id, COALESCE(SUM(di.dispatch_qty), 0) AS dispatched_qty
+        SELECT di.production_note_item_id, COALESCE(SUM(di.dispatch_qty), 0) AS dispatched_qty
         FROM ${DB_PREFIX}${DISPATCH_ITEMS_TABLE} di
         INNER JOIN ${DB_PREFIX}${DISPATCH_TABLE} d ON di.dispatch_id = d.dispatch_id
         WHERE di.status <> 'delete' AND d.status <> 'delete' AND d.dispatch_status <> 'cancelled'
-        GROUP BY di.order_item_id
-      ) dd ON oi.order_item_id = dd.order_item_id`
+        GROUP BY di.production_note_item_id
+      ) dd ON oi.production_note_item_id = dd.production_note_item_id`
     : "",
 });
 
@@ -200,17 +200,17 @@ const getTotals = async (user, filter, tables) => {
 
   const rows = await safeQuery(
     `SELECT
-       COUNT(DISTINCT o.order_id) AS total_orders,
-       COALESCE(SUM(oi.order_qty), 0) AS total_order_qty,
-       COALESCE(SUM(oi.line_value), 0) AS total_order_value,
+       COUNT(DISTINCT o.production_note_id) AS total_orders,
+       COALESCE(SUM(oi.production_note_qty), 0) AS total_production_note_qty,
+       COALESCE(SUM(oi.line_value), 0) AS total_production_note_value,
        COALESCE(SUM(${expr.ready}), 0) AS ready_qty,
        COALESCE(SUM(${expr.dispatched}), 0) AS dispatched_qty,
        COALESCE(SUM(GREATEST(${expr.ready} - ${expr.dispatched}, 0)), 0) AS ready_pending_dispatch_qty,
-       COALESCE(SUM(GREATEST(COALESCE(oi.order_qty, 0) - ${expr.ready}, 0)), 0) AS pending_qty,
+       COALESCE(SUM(GREATEST(COALESCE(oi.production_note_qty, 0) - ${expr.ready}, 0)), 0) AS pending_qty,
        COALESCE(SUM(${expr.pmk}), 0) AS pmk_procure_qty,
        COALESCE(SUM(${expr.saipl}), 0) AS saipl_mfg_qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      ${planningJoin}
      ${productionJoin}
      ${dispatchJoin}
@@ -245,7 +245,7 @@ const getSummary = async (user, filter, tables) => {
     metric("dispatched_qty", "Dispatched Qty", current.dispatched_qty, "red", previous.dispatched_qty),
     metric("pmk_procure_qty", "PMK Procure", current.pmk_procure_qty, "purple", previous.pmk_procure_qty),
 
-    metric("total_order_qty", "Total Order Qty", current.total_order_qty, "orange", previous.total_order_qty),
+    metric("total_production_note_qty", "Total Order Qty", current.total_production_note_qty, "orange", previous.total_production_note_qty),
     metric("pending_qty", "Pending Qty", current.pending_qty, "amber", previous.pending_qty),
     metric("ready_pending_dispatch_qty", "Ready Pending Dispatch", current.ready_pending_dispatch_qty, "amber", previous.ready_pending_dispatch_qty),
     metric("saipl_mfg_qty", "SAIPL MFG", current.saipl_mfg_qty, "red", previous.saipl_mfg_qty),
@@ -259,31 +259,31 @@ const getPipeline = async (user, filter, tables) => {
   const expr = getExpressions(tables);
 
   const rows = await safeQuery(
-    `SELECT LOWER(COALESCE(o.order_status, 'draft')) AS status_name,
-            COUNT(DISTINCT o.order_id) AS order_count,
-            COALESCE(SUM(oi.order_qty), 0) AS order_qty,
+    `SELECT LOWER(COALESCE(o.production_note_status, 'draft')) AS status_name,
+            COUNT(DISTINCT o.production_note_id) AS order_count,
+            COALESCE(SUM(oi.production_note_qty), 0) AS production_note_qty,
             COALESCE(SUM(${expr.produced}), 0) AS produced_qty,
             COALESCE(SUM(${expr.ready}), 0) AS ready_qty,
             COALESCE(SUM(${expr.dispatched}), 0) AS dispatched_qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      ${planningJoin}
      ${productionJoin}
      ${dispatchJoin}
      ${sql}
-     GROUP BY LOWER(COALESCE(o.order_status, 'draft'))`,
+     GROUP BY LOWER(COALESCE(o.production_note_status, 'draft'))`,
     params
   );
 
   const map = rows.reduce((acc, row) => ({ ...acc, [row.status_name]: row }), {});
   const totalOrders = rows.reduce((sum, row) => sum + toNumber(row.order_count), 0);
-  const totalOrderQty = rows.reduce((sum, row) => sum + toNumber(row.order_qty), 0);
+  const totalOrderQty = rows.reduce((sum, row) => sum + toNumber(row.production_note_qty), 0);
   const totalReadyQty = rows.reduce((sum, row) => sum + toNumber(row.ready_qty), 0);
   const totalDispatchedQty = rows.reduce((sum, row) => sum + toNumber(row.dispatched_qty), 0);
   const productionQty = rows.reduce((sum, row) => sum + (row.status_name === "production" ? toNumber(row.produced_qty) : 0), 0);
   const readyOrders = rows.reduce((sum, row) => sum + (toNumber(row.ready_qty) > 0 ? toNumber(row.order_count) : 0), 0);
   const dispatchedOrders = rows.reduce((sum, row) => sum + (toNumber(row.dispatched_qty) > 0 ? toNumber(row.order_count) : 0), 0);
-  const statusQty = (...statuses) => statuses.reduce((sum, status) => sum + toNumber(map[status]?.order_qty), 0);
+  const statusQty = (...statuses) => statuses.reduce((sum, status) => sum + toNumber(map[status]?.production_note_qty), 0);
   const statusOrders = (...statuses) => statuses.reduce((sum, status) => sum + toNumber(map[status]?.order_count), 0);
 
   const step = (key, label, value, orderCount) => ({
@@ -309,9 +309,9 @@ const getSeriesMix = async (user, filter) => {
   const { params, sql } = getOrderScope(user, filter);
   const rows = await safeQuery(
     `SELECT COALESCE(NULLIF(oi.brand_snapshot, ''), NULLIF(o.brand, ''), 'Unknown') AS label,
-            COALESCE(SUM(oi.order_qty), 0) AS qty
+            COALESCE(SUM(oi.production_note_qty), 0) AS qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      ${sql}
      GROUP BY COALESCE(NULLIF(oi.brand_snapshot, ''), NULLIF(o.brand, ''), 'Unknown')
      ORDER BY qty DESC
@@ -339,14 +339,14 @@ const getMonthlyOrders = async (user, filter = {}) => {
   if (fromDate || toDate) {
     addOrderDateScope(where, params, filter, "o");
   } else {
-    where.push("o.order_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)");
+    where.push("o.production_note_date >= DATE_SUB(CURDATE(), INTERVAL 6 MONTH)");
   }
 
   const rows = await safeQuery(
-    `SELECT DATE_FORMAT(o.order_date, '%b') AS month, DATE_FORMAT(o.order_date, '%Y-%m') AS month_key,
-            COALESCE(SUM(oi.order_qty), 0) AS qty
+    `SELECT DATE_FORMAT(o.production_note_date, '%b') AS month, DATE_FORMAT(o.production_note_date, '%Y-%m') AS month_key,
+            COALESCE(SUM(oi.production_note_qty), 0) AS qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      WHERE ${where.join(" AND ")}
      GROUP BY month_key, month
      ORDER BY month_key ASC`,
@@ -360,11 +360,11 @@ const getAlerts = async (user, filter) => {
   const rows = await CommonModel.GetMasterListDetails({
     select: `
       SUM(CASE WHEN LOWER(COALESCE(t.priority, '')) IN ('high','urgent') THEN 1 ELSE 0 END) AS priority_orders,
-      SUM(CASE WHEN LOWER(COALESCE(t.order_status, '')) = 'hold' THEN 1 ELSE 0 END) AS hold_orders,
-      SUM(CASE WHEN LOWER(COALESCE(t.order_status, '')) = 'waiting' THEN 1 ELSE 0 END) AS waiting_customer,
+      SUM(CASE WHEN LOWER(COALESCE(t.production_note_status, '')) = 'hold' THEN 1 ELSE 0 END) AS hold_orders,
+      SUM(CASE WHEN LOWER(COALESCE(t.production_note_status, '')) = 'waiting' THEN 1 ELSE 0 END) AS waiting_customer,
       SUM(CASE WHEN t.expected_delivery_date IS NOT NULL
                 AND DATE(t.expected_delivery_date) BETWEEN CURDATE() AND DATE_ADD(CURDATE(), INTERVAL 3 DAY)
-                AND LOWER(COALESCE(t.order_status, '')) NOT IN ('completed','cancelled') THEN 1 ELSE 0 END) AS dispatch_due`,
+                AND LOWER(COALESCE(t.production_note_status, '')) NOT IN ('completed','cancelled') THEN 1 ELSE 0 END) AS dispatch_due`,
     table: ORDER_TABLE,
     where,
     values,
@@ -385,33 +385,33 @@ const getRecentOrders = async (user, filter, tables) => {
   const expr = getExpressions({ ...tables, dispatch: false });
 
   const rows = await safeQuery(
-    `SELECT o.order_id, o.order_no, COALESCE(c.name, '-') AS customer_name,
+    `SELECT o.production_note_id, o.production_note_no, COALESCE(c.name, '-') AS customer_name,
             COALESCE(NULLIF(o.brand, ''), '-') AS series,
-            o.order_status, o.expected_delivery_date,
-            COALESCE(SUM(oi.order_qty), 0) AS order_qty,
+            o.production_note_status, o.expected_delivery_date,
+            COALESCE(SUM(oi.production_note_qty), 0) AS production_note_qty,
             COALESCE(SUM(${expr.ready}), 0) AS ready_qty,
-            COALESCE(SUM(GREATEST(COALESCE(oi.order_qty, 0) - ${expr.ready}, 0)), 0) AS pending_qty
+            COALESCE(SUM(GREATEST(COALESCE(oi.production_note_qty, 0) - ${expr.ready}, 0)), 0) AS pending_qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
      LEFT JOIN ${DB_PREFIX}customer c ON o.customer_id = c.customer_id
-     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      ${planningJoin}
      ${productionJoin}
      ${sql}
-     GROUP BY o.order_id, o.order_no, c.name, o.brand, o.order_status, o.expected_delivery_date
-     ORDER BY COALESCE(o.modified_date, o.created_date) DESC, o.order_id DESC
+     GROUP BY o.production_note_id, o.production_note_no, c.name, o.brand, o.production_note_status, o.expected_delivery_date
+     ORDER BY COALESCE(o.modified_date, o.created_date) DESC, o.production_note_id DESC
      LIMIT 5`,
     params
   );
 
   return rows.map((row) => ({
-    order_id: row.order_id,
-    order_no: row.order_no,
+    production_note_id: row.production_note_id,
+    production_note_no: row.production_note_no,
     customer: row.customer_name,
     series: row.series,
-    orderQty: roundQty(row.order_qty),
+    orderQty: roundQty(row.production_note_qty),
     ready: roundQty(row.ready_qty),
     pending: roundQty(row.pending_qty),
-    status: row.order_status,
+    status: row.production_note_status,
     expectedDate: row.expected_delivery_date,
   }));
 };
@@ -420,9 +420,9 @@ const getTopProducts = async (user, filter) => {
   const { params, sql } = getOrderScope(user, filter);
   const rows = await safeQuery(
     `SELECT COALESCE(NULLIF(oi.product_name_snapshot, ''), p.product_name, 'Unknown') AS product_name,
-            COALESCE(SUM(oi.order_qty), 0) AS qty
+            COALESCE(SUM(oi.production_note_qty), 0) AS qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
      ${sql}
      GROUP BY COALESCE(NULLIF(oi.product_name_snapshot, ''), p.product_name, 'Unknown')
@@ -445,13 +445,13 @@ const getTopProducts = async (user, filter) => {
 const getStatusCounts = async (user, filter) => {
   const { params, sql } = getOrderScope(user, filter);
   const rows = await safeQuery(
-    `SELECT LOWER(COALESCE(o.order_status, 'draft')) AS status_name,
-            COUNT(DISTINCT o.order_id) AS order_count,
-            COALESCE(SUM(oi.order_qty), 0) AS order_qty
+    `SELECT LOWER(COALESCE(o.production_note_status, 'draft')) AS status_name,
+            COUNT(DISTINCT o.production_note_id) AS order_count,
+            COALESCE(SUM(oi.production_note_qty), 0) AS production_note_qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      ${sql}
-     GROUP BY LOWER(COALESCE(o.order_status, 'draft'))`,
+     GROUP BY LOWER(COALESCE(o.production_note_status, 'draft'))`,
     params
   );
   return rows.reduce((acc, row) => ({ ...acc, [row.status_name]: row }), {});
@@ -462,8 +462,8 @@ const getActionKpis = async (user, filter, tables) => {
   const statusMap = await getStatusCounts(user, filter);
   const val = (status, key = "order_count") => toNumber(statusMap[status]?.[key]);
   return [
-    { key: "waiting_confirmation", label: "Waiting Confirmation", value: val("waiting"), subValue: `${formatShort(val("waiting", "order_qty"))} Qty`, tone: "amber" },
-    { key: "planning_pending", label: "Planning Pending", value: val("confirmed") + val("planning"), subValue: `${formatShort(val("confirmed", "order_qty") + val("planning", "order_qty"))} Qty`, tone: "blue" },
+    { key: "waiting_confirmation", label: "Waiting Confirmation", value: val("waiting"), subValue: `${formatShort(val("waiting", "production_note_qty"))} Qty`, tone: "amber" },
+    { key: "planning_pending", label: "Planning Pending", value: val("confirmed") + val("planning"), subValue: `${formatShort(val("confirmed", "production_note_qty") + val("planning", "production_note_qty"))} Qty`, tone: "blue" },
     { key: "production_pending", label: "Production Pending", value: val("planned") + val("production"), subValue: `${formatShort(toNumber(totals.pending_qty))} Pending Qty`, tone: "purple" },
     { key: "ready_pending_dispatch", label: "Ready Pending Dispatch", value: roundQty(totals.ready_pending_dispatch_qty), subValue: "Qty ready, not dispatched", tone: "green" },
     { key: "pmk_pending", label: "PMK Pending", value: roundQty(Math.max(toNumber(totals.pmk_procure_qty) - toNumber(totals.dispatched_qty), 0)), subValue: "Approx pending", tone: "cyan" },
@@ -474,11 +474,11 @@ const getActionKpis = async (user, filter, tables) => {
 const getOverdueOrdersCount = async (user, filter) => {
   const { params, sql } = getOrderScope(user, filter);
   const rows = await safeQuery(
-    `SELECT COUNT(DISTINCT o.order_id) AS total
+    `SELECT COUNT(DISTINCT o.production_note_id) AS total
      FROM ${DB_PREFIX}${ORDER_TABLE} o
      ${sql} AND o.expected_delivery_date IS NOT NULL
        AND DATE(o.expected_delivery_date) < CURDATE()
-       AND LOWER(COALESCE(o.order_status, '')) NOT IN ('completed','cancelled')`,
+       AND LOWER(COALESCE(o.production_note_status, '')) NOT IN ('completed','cancelled')`,
     params
   );
   return toNumber(rows[0]?.total);
@@ -489,17 +489,17 @@ const getBottleneckBoard = async (user, filter, tables) => {
   const statusMap = await getStatusCounts(user, filter);
   const { params, sql } = getOrderScope(user, filter);
   const overdue = await safeQuery(
-    `SELECT COALESCE(SUM(oi.order_qty), 0) AS qty, COUNT(DISTINCT o.order_id) AS orders, MIN(o.expected_delivery_date) AS oldest_due
+    `SELECT COALESCE(SUM(oi.production_note_qty), 0) AS qty, COUNT(DISTINCT o.production_note_id) AS orders, MIN(o.expected_delivery_date) AS oldest_due
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      ${sql} AND o.expected_delivery_date IS NOT NULL AND DATE(o.expected_delivery_date) < CURDATE()
-       AND LOWER(COALESCE(o.order_status, '')) NOT IN ('completed','cancelled')`,
+       AND LOWER(COALESCE(o.production_note_status, '')) NOT IN ('completed','cancelled')`,
     params
   );
   const row = (stage, qty, orders, tone, action, oldestDue = null) => ({ stage, qty: roundQty(qty), displayQty: formatShort(qty), orders: Math.round(toNumber(orders)), oldestDue, tone, action });
   return [
-    row("Waiting Confirmation", toNumber(statusMap.waiting?.order_qty), toNumber(statusMap.waiting?.order_count), "amber", "Confirm"),
-    row("Planning Pending", toNumber(statusMap.confirmed?.order_qty) + toNumber(statusMap.planning?.order_qty), toNumber(statusMap.confirmed?.order_count) + toNumber(statusMap.planning?.order_count), "blue", "Plan"),
+    row("Waiting Confirmation", toNumber(statusMap.waiting?.production_note_qty), toNumber(statusMap.waiting?.order_count), "amber", "Confirm"),
+    row("Planning Pending", toNumber(statusMap.confirmed?.production_note_qty) + toNumber(statusMap.planning?.production_note_qty), toNumber(statusMap.confirmed?.order_count) + toNumber(statusMap.planning?.order_count), "blue", "Plan"),
     row("Production Pending", totals.pending_qty, toNumber(statusMap.planned?.order_count) + toNumber(statusMap.production?.order_count), "purple", "Produce"),
     row("Ready Pending Dispatch", totals.ready_pending_dispatch_qty, toNumber(statusMap.ready?.order_count) + toNumber(statusMap.dispatch?.order_count), "green", "Dispatch"),
     row("PMK Pending", Math.max(toNumber(totals.pmk_procure_qty) - toNumber(totals.dispatched_qty), 0), 0, "cyan", "View PMK"),
@@ -514,27 +514,27 @@ const getProductLoad = async (user, filter, tables) => {
   const rows = await safeQuery(
     `SELECT COALESCE(NULLIF(oi.product_name_snapshot, ''), p.product_name, 'Unknown') AS product_name,
             COALESCE(NULLIF(oi.product_code_snapshot, ''), p.product_code, '') AS product_code,
-            COALESCE(SUM(oi.order_qty), 0) AS order_qty,
+            COALESCE(SUM(oi.production_note_qty), 0) AS production_note_qty,
             COALESCE(SUM(${expr.ready}), 0) AS ready_qty,
-            COALESCE(SUM(GREATEST(oi.order_qty - ${expr.ready}, 0)), 0) AS pending_qty,
+            COALESCE(SUM(GREATEST(oi.production_note_qty - ${expr.ready}, 0)), 0) AS pending_qty,
             COALESCE(SUM(${expr.saipl}), 0) AS saipl_qty,
             COALESCE(SUM(${expr.pmk}), 0) AS pmk_qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
      ${planningJoin}
      ${productionJoin}
      ${dispatchJoin}
      ${sql}
      GROUP BY COALESCE(NULLIF(oi.product_name_snapshot, ''), p.product_name, 'Unknown'), COALESCE(NULLIF(oi.product_code_snapshot, ''), p.product_code, '')
-     ORDER BY order_qty DESC
+     ORDER BY production_note_qty DESC
      LIMIT 7`,
     params
   );
   return rows.map((row) => ({
     product: row.product_name,
     productCode: row.product_code,
-    orderQty: roundQty(row.order_qty),
+    orderQty: roundQty(row.production_note_qty),
     readyQty: roundQty(row.ready_qty),
     pendingQty: roundQty(row.pending_qty),
     saiplQty: roundQty(row.saipl_qty),
@@ -563,17 +563,17 @@ const getProductionReadyTrend = async (user, filter = {}) => {
   if (fromDate || toDate) {
     addOrderDateScope(where, params, filter, "o");
   } else {
-    where.push("o.order_date >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)");
+    where.push("o.production_note_date >= DATE_SUB(CURDATE(), INTERVAL 13 DAY)");
   }
   const rows = await safeQuery(
-    `SELECT DATE_FORMAT(o.order_date, '%d %b') AS label,
-            DATE(o.order_date) AS trend_date,
+    `SELECT DATE_FORMAT(o.production_note_date, '%d %b') AS label,
+            DATE(o.production_note_date) AS trend_date,
             COALESCE(SUM(pr.produced_qty), 0) AS produced_qty,
             COALESCE(SUM(COALESCE(pr.ready_qty, pl.ready_qty, 0)), 0) AS ready_qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
-     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-     LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.order_item_id = pr.order_item_id AND pr.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.production_note_item_id = pr.production_note_item_id AND pr.status <> 'delete'
      WHERE ${where.join(" AND ")}
      GROUP BY trend_date, label
      ORDER BY trend_date ASC`,
@@ -588,10 +588,10 @@ const getPmkPending = async (user, filter) => {
     `SELECT COALESCE(NULLIF(oi.product_name_snapshot, ''), p.product_name, 'Unknown') AS name,
             COALESCE(SUM(GREATEST(COALESCE(pl.pmk_qty, 0) - COALESCE(pr.procured_qty, 0), 0)), 0) AS qty
      FROM ${DB_PREFIX}${ORDER_TABLE} o
-     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
-     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-     LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.order_item_id = pr.order_item_id AND pr.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.production_note_item_id = pr.production_note_item_id AND pr.status <> 'delete'
      ${sql}
      GROUP BY COALESCE(NULLIF(oi.product_name_snapshot, ''), p.product_name, 'Unknown')
      HAVING qty > 0
@@ -607,30 +607,30 @@ const getDispatchDue = async (user, filter, tables) => {
   const { planningJoin, productionJoin, dispatchJoin } = getJoinSql(tables);
   const expr = getExpressions(tables);
   const rows = await safeQuery(
-    `SELECT o.order_id, o.order_no, COALESCE(c.name, '-') AS customer_name,
+    `SELECT o.production_note_id, o.production_note_no, COALESCE(c.name, '-') AS customer_name,
             o.expected_delivery_date,
             COALESCE(SUM(GREATEST(${expr.ready} - ${expr.dispatched}, 0)), 0) AS due_qty,
-            o.order_status
+            o.production_note_status
      FROM ${DB_PREFIX}${ORDER_TABLE} o
      LEFT JOIN ${DB_PREFIX}customer c ON o.customer_id = c.customer_id
-     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      ${planningJoin}
      ${productionJoin}
      ${dispatchJoin}
      ${sql}
-     GROUP BY o.order_id, o.order_no, c.name, o.expected_delivery_date, o.order_status
+     GROUP BY o.production_note_id, o.production_note_no, c.name, o.expected_delivery_date, o.production_note_status
      HAVING due_qty > 0
-     ORDER BY o.expected_delivery_date ASC, o.order_id DESC
+     ORDER BY o.expected_delivery_date ASC, o.production_note_id DESC
      LIMIT 5`,
     params
   );
   return rows.map((row) => ({
-    orderId: row.order_id,
-    orderNo: row.order_no,
+    orderId: row.production_note_id,
+    orderNo: row.production_note_no,
     customer: row.customer_name,
     dueDate: row.expected_delivery_date,
     qty: roundQty(row.due_qty),
-    status: row.order_status,
+    status: row.production_note_status,
   }));
 };
 
@@ -655,16 +655,16 @@ const getLifecycleBase = async (user, filter, tables) => {
             END`;
 
   const rows = await safeQuery(
-    `SELECT o.order_id, o.pi_number AS pi_number, o.order_no,o.order_code, o.order_date, o.expected_delivery_date, o.order_status, o.priority,
+    `SELECT o.production_note_id, o.pi_number AS pi_number, o.production_note_no,o.production_code, o.production_note_date, o.expected_delivery_date, o.production_note_status, o.priority,
             COALESCE(o.currency, 'INR') AS currency,
             ${exchangeRateExpr} AS exchange_rate,
             COALESCE(c.name, '-') AS customer_name,
-            oi.order_item_id, oi.product_id,
+            oi.production_note_item_id, oi.product_id,
             COALESCE(NULLIF(oi.product_name_snapshot, ''), p.product_name, '-') AS product_name,
             COALESCE(NULLIF(oi.product_code_snapshot, ''), p.product_code, '') AS product_code,
             COALESCE(NULLIF(oi.brand_snapshot, ''), NULLIF(p.brand, ''), NULLIF(o.brand, ''), '-') AS model,
             COALESCE(p.weight, 0) AS weight,
-            COALESCE(oi.order_qty, 0) AS order_qty,
+            COALESCE(oi.production_note_qty, 0) AS production_note_qty,
             COALESCE(oi.unit_rate, 0) AS unit_rate,
             COALESCE(oi.line_value, 0) AS line_value,
             ${lineValueBaseInrExpr} AS line_value_base_inr,
@@ -675,21 +675,21 @@ const getLifecycleBase = async (user, filter, tables) => {
             ${tables.production ? "COALESCE(pr.procured_qty, 0)" : "0"} AS procured_qty,
             ${expr.ready} AS ready_qty,
             ${expr.dispatched} AS dispatched_qty,
-            GREATEST(COALESCE(oi.order_qty, 0) - ${expr.dispatched}, 0) AS balance_qty,
-            GREATEST(COALESCE(oi.order_qty, 0) - ${expr.ready}, 0) AS pending_qty,
+            GREATEST(COALESCE(oi.production_note_qty, 0) - ${expr.dispatched}, 0) AS balance_qty,
+            GREATEST(COALESCE(oi.production_note_qty, 0) - ${expr.ready}, 0) AS pending_qty,
             GREATEST(${expr.ready} - ${expr.dispatched}, 0) AS ready_pending_dispatch_qty,
             ${planningStatusExpr} AS planning_status,
             ${productionStatusExpr} AS production_status,
             ${expectedReadyDateExpr} AS expected_ready_date
      FROM ${DB_PREFIX}${ORDER_TABLE} o
      LEFT JOIN ${DB_PREFIX}customer c ON o.customer_id = c.customer_id
-     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.order_id = oi.order_id AND oi.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${ORDER_ITEMS_TABLE} oi ON o.production_note_id = oi.production_note_id AND oi.status <> 'delete'
      LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
      ${planningJoin}
      ${productionJoin}
      ${dispatchJoin}
      ${sql}
-     ORDER BY COALESCE(o.expected_delivery_date, o.order_date) ASC, o.order_id DESC, oi.order_item_id ASC
+     ORDER BY COALESCE(o.expected_delivery_date, o.production_note_date) ASC, o.production_note_id DESC, oi.production_note_item_id ASC
      LIMIT 300`,
     params
   );
@@ -697,8 +697,8 @@ const getLifecycleBase = async (user, filter, tables) => {
   return rows.map((row) => {
     const readyQty = toNumber(row.ready_qty);
     const dispatchedQty = toNumber(row.dispatched_qty);
-    const orderQty = toNumber(row.order_qty);
-    const baseStage = String(row.order_status || "draft").toLowerCase().replace(/-/g, "_");
+    const orderQty = toNumber(row.production_note_qty);
+    const baseStage = String(row.production_note_status || "draft").toLowerCase().replace(/-/g, "_");
     const currentStage = dispatchedQty >= orderQty && orderQty > 0
       ? "dispatch"
       : dispatchedQty > 0
@@ -710,7 +710,7 @@ const getLifecycleBase = async (user, filter, tables) => {
     return {
       ...row,
       current_stage: currentStage,
-      order_qty: roundQty(row.order_qty),
+      production_note_qty: roundQty(row.production_note_qty),
       planned_qty: roundQty(row.planned_qty),
       saipl_qty: roundQty(row.saipl_qty),
       pmk_qty: roundQty(row.pmk_qty),
@@ -730,7 +730,7 @@ const getLifecycleBase = async (user, filter, tables) => {
 
 const getLifecycleDashboard = async (user, filter, tables) => {
   const selectedStage = getLifecycleStageFilter(filter);
-  const baseFilter = { ...filter, stage: "", activeTab: "", tab: "", order_status: "", status: "" };
+  const baseFilter = { ...filter, stage: "", activeTab: "", tab: "", production_note_status: "", status: "" };
   const rows = await getLifecycleBase(user, baseFilter, tables);
   const isPlanningStatus = (row, statuses) => statuses.includes(String(row.planning_status || "").toLowerCase().replace(/-/g, "_"));
   const isDispatchedRow = (row) => toNumber(row.dispatched_qty) > 0 || ["dispatch", "completed"].includes(row.current_stage);
@@ -760,15 +760,15 @@ const getLifecycleDashboard = async (user, filter, tables) => {
   const filteredRows = rows.filter(matchesStage);
   const sum = (key, sourceRows = filteredRows) => roundQty(sourceRows.reduce((total, row) => total + toNumber(row[key]), 0));
   const sumValueForQty = (qtyKey, sourceRows = rows) => roundQty(sourceRows.reduce((total, row) => {
-    const orderQty = toNumber(row.order_qty);
+    const orderQty = toNumber(row.production_note_qty);
     if (!orderQty) return total;
     const qty = Math.min(Math.max(toNumber(row[qtyKey]), 0), orderQty);
     return total + ((toNumber(row.line_value) * qty) / orderQty);
   }, 0));
-  const countOrders = (sourceRows) => new Set(sourceRows.map((row) => row.order_id).filter(Boolean)).size;
+  const countOrders = (sourceRows) => new Set(sourceRows.map((row) => row.production_note_id).filter(Boolean)).size;
   const totalOrderCount = countOrders(rows);
   const totalOrderValue = sum("line_value", rows);
-  const tab = (key, label, sourceRows) => ({ key, label, count: countOrders(sourceRows), qty: sum("order_qty", sourceRows) });
+  const tab = (key, label, sourceRows) => ({ key, label, count: countOrders(sourceRows), qty: sum("production_note_qty", sourceRows) });
 
   return {
     activeTab: selectedStage,
@@ -782,9 +782,9 @@ const getLifecycleDashboard = async (user, filter, tables) => {
     ],
     summary: {
       total_orders: totalOrderCount,
-      total_order_qty: sum("order_qty", rows),
+      total_production_note_qty: sum("production_note_qty", rows),
       total_value: totalOrderValue,
-      total_order_value: totalOrderValue,
+      total_production_note_value: totalOrderValue,
       avg_order_value: totalOrderCount ? roundQty(totalOrderValue / totalOrderCount) : 0,
       planned_qty: sum("planned_qty", rows),
       planned_value: sumValueForQty("planned_qty", rows),

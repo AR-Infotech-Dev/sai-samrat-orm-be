@@ -19,6 +19,7 @@
       font-family: Arial, Helvetica, sans-serif;
       font-size: 7.6px;
       line-height: 1.12;
+      scrollbar-width:none;
     }
 
     .pi-page {
@@ -92,11 +93,11 @@
     }
 
     /* Adjacent sections share one horizontal boundary. */
-    .pi-page > .pi-table + .pi-table:not(.pi-title) {
+    .pi-page>.pi-table+.pi-table:not(.pi-title) {
       margin-top: -1px;
     }
 
-    .pi-page > .pi-title + .pi-table {
+    .pi-page>.pi-title+.pi-table {
       margin-top: 0;
     }
 
@@ -306,11 +307,11 @@
       font-size: 6.7px;
     }
 
-    .pi-bank-table tr:first-child > * {
+    .pi-bank-table tr:first-child>* {
       border-top: 0;
     }
 
-    .pi-bank-table tr:last-child > * {
+    .pi-bank-table tr:last-child>* {
       border-bottom: 0;
     }
 
@@ -424,15 +425,15 @@
       margin: 0;
     }
 
-    .pi-header-terms tr > :first-child {
+    .pi-header-terms tr> :first-child {
       border-left: 0;
     }
 
-    .pi-header-terms tr > :last-child {
+    .pi-header-terms tr> :last-child {
       border-right: 0;
     }
 
-    .pi-header-terms tr:last-child > * {
+    .pi-header-terms tr:last-child>* {
       border-bottom: 0;
     }
 
@@ -442,6 +443,7 @@
     }
 
     @media screen {
+
       html,
       body {
         background: #f1f5f9;
@@ -455,11 +457,15 @@
     }
 
     @media screen and (max-width: 640px) {
-      .pi-page { zoom: 0.55; }
+      .pi-page {
+        zoom: 0.55;
+      }
     }
 
     @media screen and (max-width: 440px) {
-      .pi-page { zoom: 0.38; }
+      .pi-page {
+        zoom: 0.38;
+      }
     }
 
     @media print {
@@ -523,12 +529,14 @@
           <table class="pi-border-none pi-full pi-header-meta">
             <tbody class="pi-padding-none pi-w-full">
               <tr class="pi-border-none">
-                <th class="pi-left pi-padding-none-y pi-medium pi-border-none pi-w-small-m" style="padding-left: 2px !important;" colspan="1">PROFORMA INVOICE
+                <th class="pi-left pi-padding-none-y pi-medium pi-border-none pi-w-small-m"
+                  style="padding-left: 2px !important;" colspan="1">PROFORMA INVOICE
                   NO.</th>
-                <td class="pi-border-none pi-padding-none-y pi-w-medium-m" >{{invoice.pi_no}}</td>
+                <td class="pi-border-none pi-padding-none-y pi-w-medium-m">{{invoice.pi_no}}</td>
               </tr>
               <tr class="pi-header-right">
-                <th class="pi-left pi-padding-none-y pi-medium pi-border-none pi-small-m" style="padding-left: 2px !important;" colspan="1">PROFORMA INVOICE
+                <th class="pi-left pi-padding-none-y pi-medium pi-border-none pi-small-m"
+                  style="padding-left: 2px !important;" colspan="1">PROFORMA INVOICE
                   DATE</th>
                 <td class="pi-border-none pi-padding-none-y pi-medium-m">{{invoice.pi_date}}</td>
               </tr>
@@ -788,7 +796,10 @@
       <tr class="pi-bank">
         <td style="width: 59%;" class="pi-bank-left pi-padding-none">
           <table class="pi-table pi-border-collapse pi-bank-table">
-            <colgroup><col style="width:31%"><col style="width:69%"></colgroup>
+            <colgroup>
+              <col style="width:31%">
+              <col style="width:69%">
+            </colgroup>
             <tr class="pi-border-collapse">
               <th class="pi-left pi-border-none" colspan="2">
                 <div class="pi-label">BANK DETAILS</div>
@@ -868,7 +879,8 @@
           <div>- SAIPL WILL NOT BE HELD RESPONSIBLE FOR ANY EXTRA CHARGES, DETENTION OR FINES APPLIED BY SHIPPING LINE.
           </div>
         </td>
-        <td class="pi-cert-text" style="width:42%">I hereby certify that this invoice shows the actual price of goods described, that no
+        <td class="pi-cert-text" style="width:42%">I hereby certify that this invoice shows the actual price of goods
+          described, that no
           other invoice has been issued, and that all particulars are true and correct.</td>
       </tr>
     </table>
@@ -886,7 +898,15 @@
           <table class="pi-approval-table">
             <tr>
               <td>CHECKED BY</td>
-              <td>APPROVED BY</td>
+              <td>
+                <span>
+                  MR.{{invoice.approved_by}}
+                </span>
+                <br>
+                <span>
+                  APPROVED BY
+                </span>
+              </td>
             </tr>
           </table>
         </td>

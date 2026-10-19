@@ -1,4 +1,5 @@
 import * as piController from "./proforma-invoice/proforma-invoice.controller.js";
+import { changePiLifecycle } from "./proforma-invoice/pi-lifecycle.controller.js";
 import express from "express";
 import * as bookingController from "./booking/booking.controller.js";
 import { productionNote } from "./booking/production-note.controller.js";
@@ -12,28 +13,30 @@ import { requirePermission } from "#middlewares/permissions.middleware.js";
 const ordersRoutes = express.Router();
 
 
-ordersRoutes.post("/proforma-invoice", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.list);
-ordersRoutes.post("/proforma-invoice/active-list", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.activeList);
-ordersRoutes.get("/proforma-invoice/:id/items", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.getItems);
-ordersRoutes.get("/proforma-invoice/:id/preview", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.preview);
-ordersRoutes.get("/proforma-invoice/:id/pdf", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.preview);
-ordersRoutes.post("/proforma-invoice/delete", requirePermission(["proforma-invoice", "order-booking"], "delete"), piController.changeStatus);
-ordersRoutes.put("/proforma-invoice/create", requirePermission(["proforma-invoice", "order-booking"], "create"), piController.getDetails);
-ordersRoutes.get("/proforma-invoice/:id", requirePermission(["proforma-invoice", "order-booking"], "view"), piController.getDetails);
-ordersRoutes.post("/proforma-invoice/:id", requirePermission(["proforma-invoice", "order-booking"], "edit"), piController.getDetails);
+ordersRoutes.post("/proforma-invoice/:id/approve", changePiLifecycle);
+ordersRoutes.post("/proforma-invoice", requirePermission(["proforma-invoice", "production-notes"], "view"), piController.list);
+ordersRoutes.post("/proforma-invoice/active-list", requirePermission(["proforma-invoice", "production-notes"], "view"), piController.activeList);
+ordersRoutes.post("/proforma-invoice/:id/submit", changePiLifecycle);
+ordersRoutes.get("/proforma-invoice/:id/items", requirePermission(["proforma-invoice", "production-notes"], "view"), piController.getItems);
+ordersRoutes.get("/proforma-invoice/:id/preview", requirePermission(["proforma-invoice", "production-notes"], "view"), piController.preview);
+ordersRoutes.get("/proforma-invoice/:id/pdf", requirePermission(["proforma-invoice", "production-notes"], "view"), piController.preview);
+ordersRoutes.post("/proforma-invoice/delete", requirePermission(["proforma-invoice", "production-notes"], "delete"), piController.changeStatus);
+ordersRoutes.put("/proforma-invoice/create", requirePermission(["proforma-invoice", "production-notes"], "create"), piController.getDetails);
+ordersRoutes.get("/proforma-invoice/:id", requirePermission(["proforma-invoice", "production-notes"], "view"), piController.getDetails);
+ordersRoutes.post("/proforma-invoice/:id", requirePermission(["proforma-invoice", "production-notes"], "edit"), piController.getDetails);
 
-ordersRoutes.post("/confirmation", requirePermission(["order-confirmation"], "view"), confirmationController.list);
-ordersRoutes.get("/confirmation/:id", requirePermission(["order-confirmation"], "view"), confirmationController.details);
-ordersRoutes.get("/confirmation/:id/proforma-invoice/preview", requirePermission(["order-confirmation"], "view"), confirmationController.proformaInvoicePreview);
-ordersRoutes.post("/confirmation/:id/confirm", requirePermission(["order-confirmation"], "edit"), confirmationController.confirm);
-ordersRoutes.post("/confirmation/:id/hold", requirePermission(["order-confirmation"], "edit"), confirmationController.hold);
-ordersRoutes.post("/confirmation/:id/send-back", requirePermission(["order-confirmation"], "edit"), confirmationController.sendBack);
+ordersRoutes.post("/confirmation", requirePermission(["note-confirmation"], "view"), confirmationController.list);
+ordersRoutes.get("/confirmation/:id", requirePermission(["note-confirmation"], "view"), confirmationController.details);
+ordersRoutes.get("/confirmation/:id/proforma-invoice/preview", requirePermission(["note-confirmation"], "view"), confirmationController.proformaInvoicePreview);
+ordersRoutes.post("/confirmation/:id/confirm", requirePermission(["note-confirmation"], "edit"), confirmationController.confirm);
+ordersRoutes.post("/confirmation/:id/hold", requirePermission(["note-confirmation"], "edit"), confirmationController.hold);
+ordersRoutes.post("/confirmation/:id/send-back", requirePermission(["note-confirmation"], "edit"), confirmationController.sendBack);
 
-ordersRoutes.post("/planning", requirePermission(["order-planning"], "view"), planningController.list);
-ordersRoutes.get("/planning/order/:orderId", requirePermission(["order-planning"], "view"), planningController.orderDetails);
-ordersRoutes.post("/planning/order/:orderId/save", requirePermission(["order-planning"], "edit"), planningController.saveOrderPlanning);
-ordersRoutes.get("/planning/:orderItemId", requirePermission(["order-planning"], "view"), planningController.details);
-ordersRoutes.post("/planning/:orderItemId/save", requirePermission(["order-planning"], "edit"), planningController.savePlanning);
+ordersRoutes.post("/planning", requirePermission(["production-planning"], "view"), planningController.list);
+ordersRoutes.get("/planning/order/:orderId", requirePermission(["production-planning"], "view"), planningController.orderDetails);
+ordersRoutes.post("/planning/order/:orderId/save", requirePermission(["production-planning"], "edit"), planningController.saveOrderPlanning);
+ordersRoutes.get("/planning/:orderItemId", requirePermission(["production-planning"], "view"), planningController.details);
+ordersRoutes.post("/planning/:orderItemId/save", requirePermission(["production-planning"], "edit"), planningController.savePlanning);
 
 ordersRoutes.post("/production", requirePermission(["production"], "view"), productionController.list);
 ordersRoutes.get("/production/order/:orderId", requirePermission(["production"], "view"), productionController.orderDetails);
@@ -49,14 +52,14 @@ ordersRoutes.post("/dispatch/:dispatchId", requirePermission(["dispatch"], "edit
 ordersRoutes.post("/ready-stock", requirePermission(["ready-stock"], "view"), readyStockController.list);
 ordersRoutes.get("/ready-stock/order/:orderId", requirePermission(["ready-stock"], "view"), readyStockController.orderDetails);
 
-ordersRoutes.post("/", requirePermission(["order-booking"], "view"), bookingController.list);
-ordersRoutes.post("/delete", requirePermission(["order-booking"], "delete"), bookingController.changeStatus);
-ordersRoutes.put("/create", requirePermission(["order-booking"], "create"), bookingController.getOrderDetails);
-ordersRoutes.get("/:id/preview",requirePermission(["order-booking"], "view"),bookingController.preview);
-ordersRoutes.get("/:id/production-note/preview", requirePermission(["order-booking"], "view"), productionNote);
-ordersRoutes.get("/:id/production-note/pdf", requirePermission(["order-booking"], "view"), productionNote);
-ordersRoutes.get("/:id", requirePermission(["order-booking"], "view"), bookingController.getOrderDetails);
-ordersRoutes.post("/:id", requirePermission(["order-booking"], "edit"), bookingController.getOrderDetails);
+ordersRoutes.post("/", requirePermission(["production-notes"], "view"), bookingController.list);
+ordersRoutes.post("/delete", requirePermission(["production-notes"], "delete"), bookingController.changeStatus);
+ordersRoutes.put("/create", requirePermission(["production-notes"], "create"), bookingController.getOrderDetails);
+ordersRoutes.get("/:id/preview",requirePermission(["production-notes"], "view"),bookingController.preview);
+ordersRoutes.get("/:id/production-note/preview", requirePermission(["production-notes"], "view"), productionNote);
+ordersRoutes.get("/:id/production-note/pdf", requirePermission(["production-notes"], "view"), productionNote);
+ordersRoutes.get("/:id", requirePermission(["production-notes"], "view"), bookingController.getOrderDetails);
+ordersRoutes.post("/:id", requirePermission(["production-notes"], "edit"), bookingController.getOrderDetails);
 
 export default ordersRoutes;
 

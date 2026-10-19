@@ -1,0 +1,4 @@
+import { query } from "../config/database.js";
+console.log(JSON.stringify(await query("SELECT TABLE_NAME,COLUMN_NAME,COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND (COLUMN_NAME LIKE '%order%' OR TABLE_NAME LIKE '%order%' OR TABLE_NAME LIKE '%menu%' OR TABLE_NAME LIKE '%permission%')")));
+console.log(JSON.stringify(await query("SELECT TABLE_NAME,CONSTRAINT_NAME,COLUMN_NAME,REFERENCED_TABLE_NAME,REFERENCED_COLUMN_NAME FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL")));
+process.exit(0);

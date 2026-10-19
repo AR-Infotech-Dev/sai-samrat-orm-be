@@ -5,11 +5,12 @@ import { prepareFilterData } from "#shared/utils/filter.builder.js";
 import { toMysqlDateTime } from "#shared/utils/dateTime.js";
 // import { isSuperAdminRole as isSuperAdmin } from "#shared/utils/role.utils.js";
 import { env } from "#config/env.js";
+import { getLatestReadyDate } from "../shared/planning-date.helper.js";
 
-const MODULE_TABLE = "orders";
-const ORDERS_LINE_TABLE = "order_items";
-const PLANNING_TABLE = "order_item_planning";
-const PLANNING_HISTORY_TABLE = "order_item_planning_history";
+const MODULE_TABLE = "production_notes";
+const ORDERS_LINE_TABLE = "production_note_items";
+const PLANNING_TABLE = "production_note_item_planning";
+const PLANNING_HISTORY_TABLE = "production_note_item_planning_history";
 
 const default_columns = {};
 const custom_columns = {
@@ -20,12 +21,12 @@ const custom_columns = {
     key2: "customer_id",
     select: "cu.mobile_no AS customer_mobile, cu.email AS customer_email",
   },
-  order_status: {
+  production_note_status: {
     table: "categories",
     alias: "ct",
     column: "categoryName",
     key2: "slug",
-    select: "ct.cat_color as order_status_color",
+    select: "ct.cat_color as production_note_status_color",
   },
   priority: {
     table: "categories",
@@ -101,7 +102,7 @@ const calculatePlanningPendingQty = ({ orderQty, saiplQty, pmkQty, readyQty }) =
 };
 
 const fetchPlanningTargetItem = async ({ orderItemId, user }) => {
-  const where = ["oi.order_item_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.order_status IN ('confirmed','planned')"];
+  const where = ["oi.production_note_item_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.production_note_status IN ('confirmed','planned')"];
   const values = [orderItemId];
 
   // if (!isSuperAdmin(user) && user?.company_id) {
@@ -110,9 +111,9 @@ const fetchPlanningTargetItem = async ({ orderItemId, user }) => {
   // }
 
   const itemRows = await query(
-    `SELECT oi.order_item_id, oi.order_id, oi.company_id, oi.order_qty, o.priority AS order_priority
+    `SELECT oi.production_note_item_id, oi.production_note_id, oi.company_id, oi.production_note_qty, o.priority AS order_priority
      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-     INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.order_id = o.order_id
+     INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.production_note_id = o.production_note_id
      WHERE ${where.join(" AND ")}`,
     values
   );
@@ -124,30 +125,30 @@ const getPlanningAggregateByOrderIds = async (orderIds = []) => {
 
   const placeholders = orderIds.map(() => "?").join(",");
   const rows = await query(
-    `SELECT oi.order_id,
-            COALESCE(COUNT(oi.order_item_id), 0) AS total_items,
-            COALESCE(SUM(oi.order_qty), 0) AS item_total_qty,
+    `SELECT oi.production_note_id,
+            COALESCE(COUNT(oi.production_note_item_id), 0) AS total_items,
+            COALESCE(SUM(oi.production_note_qty), 0) AS item_total_qty,
             COALESCE(SUM(pl.saipl_qty), 0) AS saipl_qty,
             COALESCE(SUM(pl.pmk_qty), 0) AS pmk_qty,
             COALESCE(SUM(pl.ready_qty), 0) AS ready_qty,
             COALESCE(SUM(pl.dispatched_qty), 0) AS dispatched_qty,
-            COALESCE(SUM(COALESCE(pl.pending_qty, oi.order_qty)), 0) AS pending_qty,
+            COALESCE(SUM(COALESCE(pl.pending_qty, oi.production_note_qty)), 0) AS pending_qty,
             SUM(CASE WHEN pl.planning_id IS NULL OR pl.planning_status = 'not_planned' THEN 1 ELSE 0 END) AS unplanned_items,
             CASE
               WHEN SUM(CASE WHEN pl.planning_id IS NULL OR pl.planning_status = 'not_planned' THEN 1 ELSE 0 END) > 0 THEN 'pending_planning'
-              WHEN COALESCE(SUM(pl.ready_qty), 0) >= COALESCE(SUM(oi.order_qty), 0) AND COALESCE(SUM(oi.order_qty), 0) > 0 THEN 'ready'
+              WHEN COALESCE(SUM(pl.ready_qty), 0) >= COALESCE(SUM(oi.production_note_qty), 0) AND COALESCE(SUM(oi.production_note_qty), 0) > 0 THEN 'ready'
               WHEN COALESCE(SUM(pl.ready_qty), 0) > 0 THEN 'partially_ready'
               ELSE 'planned'
             END AS planning_status
      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-     WHERE oi.status <> 'delete' AND oi.order_id IN (${placeholders})
-     GROUP BY oi.order_id`,
+     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+     WHERE oi.status <> 'delete' AND oi.production_note_id IN (${placeholders})
+     GROUP BY oi.production_note_id`,
     orderIds
   );
 
   return rows.reduce((acc, row) => {
-    acc[row.order_id] = row;
+    acc[row.production_note_id] = row;
     return acc;
   }, {});
 };
@@ -161,7 +162,7 @@ const applyPlanningStatusFilter = (rows = [], status = "all") => {
 };
 
 const updateOrderPlanningStatus = async ({ orderId, user }) => {
-  const where = ["oi.order_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.order_status IN ('confirmed','planned')"];
+  const where = ["oi.production_note_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.production_note_status IN ('confirmed','planned')"];
   const values = [orderId];
 
   // if (!isSuperAdmin(user) && user?.company_id) {
@@ -170,13 +171,14 @@ const updateOrderPlanningStatus = async ({ orderId, user }) => {
   // }
 
   const rows = await query(
-    `SELECT oi.order_item_id, oi.order_qty,
+    `SELECT oi.production_note_item_id, oi.production_note_qty,
             COALESCE(pl.saipl_qty, 0) AS saipl_qty,
             COALESCE(pl.pmk_qty, 0) AS pmk_qty,
-            COALESCE(pl.ready_qty, 0) AS ready_qty
+            COALESCE(pl.ready_qty, 0) AS ready_qty,
+            DATE_FORMAT(pl.expected_ready_date, '%Y-%m-%d') AS expected_ready_date
      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-     INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.order_id = o.order_id
-     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.production_note_id = o.production_note_id
+     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
      WHERE ${where.join(" AND ")}`,
     values
   );
@@ -184,13 +186,14 @@ const updateOrderPlanningStatus = async ({ orderId, user }) => {
   if (!rows.length) return "confirmed";
 
   const isFullyPlanned = rows.every((row) => {
-    const orderQty = toNumber(row.order_qty);
+    const orderQty = toNumber(row.production_note_qty);
     const plannedQty = toNumber(row.saipl_qty) + toNumber(row.pmk_qty) + toNumber(row.ready_qty);
     return orderQty > 0 && plannedQty === orderQty;
   });
 
   const nextOrderStatus = isFullyPlanned ? "planned" : "confirmed";
-  const orderWhere = { order_id: orderId };
+  const latestReadyDate = getLatestReadyDate(rows);
+  const orderWhere = { production_note_id: orderId };
   // if (!isSuperAdmin(user) && user?.company_id) {
   //   orderWhere.company_id = user.company_id;
   // }
@@ -198,7 +201,8 @@ const updateOrderPlanningStatus = async ({ orderId, user }) => {
   await CommonModel.updateMasterDetails({
     table: MODULE_TABLE,
     data: {
-      order_status: nextOrderStatus,
+      production_note_status: nextOrderStatus,
+      ...(latestReadyDate ? { expected_delivery_date: latestReadyDate } : {}),
       modified_by: user.adminID,
       modified_date: toMysqlDateTime(),
     },
@@ -209,7 +213,7 @@ const updateOrderPlanningStatus = async ({ orderId, user }) => {
 };
 
 const savePlanningForItem = async ({ item, body, user }) => {
-  const orderQty = toNumber(item.order_qty);
+  const orderQty = toNumber(item.production_note_qty);
   const saiplQty = toNumber(body.saipl_qty);
   const pmkQty = toNumber(body.pmk_qty);
   const readyQty = toNumber(body.ready_qty);
@@ -218,7 +222,7 @@ const savePlanningForItem = async ({ item, body, user }) => {
   const pendingQty = calculatePlanningPendingQty({ orderQty, saiplQty, pmkQty, readyQty });
 
   if (plannedQty > orderQty) {
-    throw new Error(`SAIPL + PMK + Ready qty cannot be greater than order qty for item ${item.order_item_id}`);
+    throw new Error(`SAIPL + PMK + Ready qty cannot be greater than order qty for item ${item.production_note_item_id}`);
   }
 
   const planningStatus = buildPlanningStatus({
@@ -233,7 +237,7 @@ const savePlanningForItem = async ({ item, body, user }) => {
   const planningNote = body.planning_note || null;
 
   const existingRows = await CommonModel.getMasterDetails(PLANNING_TABLE, "*", {
-    order_item_id: item.order_item_id,
+    production_note_item_id: item.production_note_item_id,
   });
   const existing = existingRows.find((row) => row.status !== "delete");
 
@@ -266,8 +270,8 @@ const savePlanningForItem = async ({ item, body, user }) => {
       table: PLANNING_TABLE,
       data: {
         company_id: item.company_id,
-        order_id: item.order_id,
-        order_item_id: item.order_item_id,
+        production_note_id: item.production_note_id,
+        production_note_item_id: item.production_note_item_id,
         ...planningData,
         planned_date: toMysqlDateTime().slice(0, 10),
         created_by: user.adminID,
@@ -284,7 +288,7 @@ const savePlanningForItem = async ({ item, body, user }) => {
       data: {
         company_id: item.company_id,
         planning_id: planningId,
-        order_item_id: item.order_item_id,
+        production_note_item_id: item.production_note_item_id,
         old_saipl_qty: existing.saipl_qty,
         new_saipl_qty: saiplQty,
         old_pmk_qty: existing.pmk_qty,
@@ -302,7 +306,7 @@ const savePlanningForItem = async ({ item, body, user }) => {
 
   return {
     planning_id: planningId,
-    order_item_id: item.order_item_id,
+    production_note_item_id: item.production_note_item_id,
     planning_status: planningStatus,
     pending_qty: pendingQty,
   };
@@ -321,7 +325,7 @@ export const list = async (req, res) => {
       other: {
         orderBy,
         order,
-        searchColumns: ["order_no"],
+        searchColumns: ["production_note_no"],
       },
       default_columns,
       custom_columns,
@@ -329,9 +333,9 @@ export const list = async (req, res) => {
 
     const { select, where, values, join, other } = filterData;
     where.push("t.status <> 'delete'");
-    where.push("t.order_status IN ('confirmed')");
+    where.push("t.production_note_status IN ('confirmed')");
     other.freeTextSearch = searchText;
-    other.searchColumns = ["t.order_no", "t.brand", "cu.name", "sp.name"];
+    other.searchColumns = ["t.production_note_no", "t.brand", "cu.name", "sp.name"];
 
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.push("t.company_id = ?");
@@ -357,19 +361,19 @@ export const list = async (req, res) => {
       other,
     });
 
-    const orderIds = orderList.map((row) => row.order_id).filter(Boolean);
+    const orderIds = orderList.map((row) => row.production_note_id).filter(Boolean);
     const aggregateMap = await getPlanningAggregateByOrderIds(orderIds);
     const enrichedList = orderList.map((row) => ({
       ...row,
-      total_items: aggregateMap[row.order_id]?.total_items || 0,
-      item_total_qty: aggregateMap[row.order_id]?.item_total_qty || 0,
-      saipl_qty: aggregateMap[row.order_id]?.saipl_qty || 0,
-      pmk_qty: aggregateMap[row.order_id]?.pmk_qty || 0,
-      ready_qty: aggregateMap[row.order_id]?.ready_qty || 0,
-      dispatched_qty: aggregateMap[row.order_id]?.dispatched_qty || 0,
-      pending_qty: aggregateMap[row.order_id]?.pending_qty || row.total_order_qty || 0,
-      unplanned_items: aggregateMap[row.order_id]?.unplanned_items || 0,
-      planning_status: aggregateMap[row.order_id]?.planning_status || "pending_planning",
+      total_items: aggregateMap[row.production_note_id]?.total_items || 0,
+      item_total_qty: aggregateMap[row.production_note_id]?.item_total_qty || 0,
+      saipl_qty: aggregateMap[row.production_note_id]?.saipl_qty || 0,
+      pmk_qty: aggregateMap[row.production_note_id]?.pmk_qty || 0,
+      ready_qty: aggregateMap[row.production_note_id]?.ready_qty || 0,
+      dispatched_qty: aggregateMap[row.production_note_id]?.dispatched_qty || 0,
+      pending_qty: aggregateMap[row.production_note_id]?.pending_qty || row.total_production_note_qty || 0,
+      unplanned_items: aggregateMap[row.production_note_id]?.unplanned_items || 0,
+      planning_status: aggregateMap[row.production_note_id]?.planning_status || "pending_planning",
     }));
 
     const filteredList = applyPlanningStatusFilter(enrichedList, status);
@@ -396,13 +400,13 @@ export const getDetails = async (req, res) => {
     const { orderId } = req.params;
     if (!orderId) return failureResponse(res, { code: 2004, httpStatus: 404 });
 
-    const where = { order_id: orderId };
+    const where = { production_note_id: orderId };
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.company_id = req.user.company_id;
     // }
 
     const orderRows = await CommonModel.getMasterDetails(MODULE_TABLE, "*", where);
-    const orderDetails = orderRows.find((row) => row.status !== "delete" && ["confirmed", "planned"].includes(row.order_status));
+    const orderDetails = orderRows.find((row) => row.status !== "delete" && ["confirmed", "planned"].includes(row.production_note_status));
     if (!orderDetails) return failureResponse(res, { code: 2004, httpStatus: 404 });
 
     const customerRows = orderDetails.customer_id
@@ -410,29 +414,29 @@ export const getDetails = async (req, res) => {
       : [];
 
     const items = await query(
-      `SELECT oi.order_item_id, oi.order_id, oi.company_id, oi.product_id,
+      `SELECT oi.production_note_item_id, oi.production_note_id, oi.company_id, oi.product_id,
               COALESCE(oi.product_code_snapshot, p.product_code) AS product_code,
               COALESCE(oi.product_name_snapshot, p.product_name) AS product_name,
               COALESCE(oi.brand_snapshot, p.brand) AS series,
               p.weight,
               p.fg_code,
-              oi.order_qty, oi.unit_rate, oi.line_value,
+              oi.production_note_qty, oi.unit_rate, oi.line_value,
               COALESCE(p.gst_rate, 18) AS gst_rate,
               COALESCE(pl.saipl_qty, 0) AS saipl_qty,
               COALESCE(pl.pmk_qty, 0) AS pmk_qty,
               COALESCE(pl.planned_qty, 0) AS planned_qty,
               COALESCE(pl.ready_qty, 0) AS ready_qty,
               COALESCE(pl.dispatched_qty, 0) AS dispatched_qty,
-              COALESCE(pl.pending_qty, oi.order_qty) AS pending_qty,
+              COALESCE(pl.pending_qty, oi.production_note_qty) AS pending_qty,
               COALESCE(pl.planning_status, 'not_planned') AS planning_status,
               pl.expected_ready_date,
               COALESCE(pl.priority, ?, 'normal') AS priority,
               pl.planning_note
        FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
        LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
-       LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-       WHERE oi.order_id = ? AND oi.status <> 'delete'
-       ORDER BY oi.order_item_id ASC`,
+       LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+       WHERE oi.production_note_id = ? AND oi.status <> 'delete'
+       ORDER BY oi.production_note_item_id ASC`,
       [orderDetails.priority, orderId]
     );
 
@@ -461,16 +465,16 @@ export const getItemDetails = async (req, res) => {
     if (!item) return failureResponse(res, { code: 2004, httpStatus: 404 });
 
     const rows = await query(
-      `SELECT oi.*, o.order_no, o.order_date, o.expected_delivery_date, o.priority AS order_priority,
+      `SELECT oi.*, o.production_note_no, o.production_note_date, o.expected_delivery_date, o.priority AS order_priority,
               c.name AS customer_name, c.mobile_no AS customer_mobile, c.email AS customer_email,
               p.product_code, p.product_name, p.brand, p.weight, p.standard_rate, p.gst_rate,
               pl.*
        FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-       INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.order_id = o.order_id
+       INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.production_note_id = o.production_note_id
        LEFT JOIN ${DB_PREFIX}customer c ON o.customer_id = c.customer_id
        LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
-       LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-       WHERE oi.order_item_id = ? AND oi.status <> 'delete' AND o.order_status IN ('confirmed','planned')`,
+       LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+       WHERE oi.production_note_item_id = ? AND oi.status <> 'delete' AND o.production_note_status IN ('confirmed','planned')`,
       [orderItemId]
     );
 
@@ -489,11 +493,11 @@ export const savePlanning = async (req, res) => {
     if (!item) return failureResponse(res, { code: 2004, httpStatus: 404 });
 
     const saved = await savePlanningForItem({ item, body: req.body || {}, user: req.user });
-    const orderStatus = await updateOrderPlanningStatus({ orderId: item.order_id, user: req.user });
+    const orderStatus = await updateOrderPlanningStatus({ orderId: item.production_note_id, user: req.user });
     return successResponse(res, {
       code: 1002,
       httpStatus: 200,
-      data: { ...saved, order_status: orderStatus },
+      data: { ...saved, production_note_status: orderStatus },
       message: "Planning saved successfully",
     });
   } catch (error) {
@@ -524,9 +528,9 @@ export const saveOrderPlanning = async (req, res) => {
     let row_index = 0;
     for (const row of items) {
       row_index++;
-      const orderItemId = row.order_item_id;
+      const orderItemId = row.production_note_item_id;
       const item = await fetchPlanningTargetItem({ orderItemId, user: req.user });
-      if (!item || Number(item.order_id) !== Number(orderId)) {
+      if (!item || Number(item.production_note_id) !== Number(orderId)) {
         return failureResponse(res, {
           code: 2004,
           httpStatus: 404,
@@ -541,7 +545,7 @@ export const saveOrderPlanning = async (req, res) => {
     return successResponse(res, {
       code: 1002,
       httpStatus: 200,
-      data: { order_id: orderId, order_status: orderStatus, items: savedItems },
+      data: { production_note_id: orderId, production_note_status: orderStatus, items: savedItems },
       message: "Order planning saved successfully",
     });
   } catch (error) {
