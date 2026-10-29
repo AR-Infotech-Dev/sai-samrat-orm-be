@@ -21,6 +21,6 @@ export const transitionPi = async (id, from, to, userId) => withPiWriteLock(id, 
         approved_by = CASE WHEN ? = 'approved' THEN ? ELSE approved_by END,
         approved_at = CASE WHEN ? = 'approved' THEN NOW() ELSE approved_at END
     WHERE pi_id = ? AND pi_status = ? AND status <> 'delete'`,
-  [to, userId, to, userId, to, id, from]);
+    [to, userId, to, userId, to, id, from]);
   return result.affectedRows > 0;
 });

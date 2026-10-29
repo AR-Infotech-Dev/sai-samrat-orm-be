@@ -576,10 +576,12 @@ export const preview = async (req, res) => {
               cu.country AS customer_country,
               cu.postal_code AS customer_postal_code,
               au.name AS approved_by_name,
+              cb.name AS created_by_name,
               cu.vat_no AS customer_vat_no
        FROM ${DB_PREFIX}${MODULE_TABLE} pi
        LEFT JOIN ${DB_PREFIX}customer cu ON pi.customer_id = cu.customer_id
        LEFT JOIN ${DB_PREFIX}admin au ON pi.approved_by = au.adminID
+       LEFT JOIN ${DB_PREFIX}admin cb ON pi.created_by = au.adminID
        WHERE pi.pi_id = ? AND pi.status <> 'delete'`,
       [pi_id]
     );
@@ -636,6 +638,7 @@ export const preview = async (req, res) => {
         currency_symbol: currencySymbol,
         remarks: pi.remarks || "-",
         approved_by: pi.approved_by_name || "-",
+        created_by: pi.created_by_name || "-",
       },
       customer: {
         name: pi.customer_company_name || pi.customer_name || "-",
@@ -674,7 +677,7 @@ export const preview = async (req, res) => {
         sr_no: idx + 1,
         brand: pickText(it.brand_snapshot, it.product_brand, pi.brand),
         model_code: pickText(it.product_code_snapshot, it.product_code),
-        fg_code:pickText(it.fg_code),
+        fg_code: pickText(it.fg_code),
         description: pickText(it.product_description),
         marking: pickText(it.product_marking, it.product_name_snapshot, it.product_name),
         hsn_code: "85072000",

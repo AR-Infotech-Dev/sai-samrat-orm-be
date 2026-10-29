@@ -19,7 +19,7 @@
       font-family: Arial, Helvetica, sans-serif;
       font-size: 7.6px;
       line-height: 1.12;
-      scrollbar-width:none;
+      scrollbar-width: none;
     }
 
     .pi-page {
@@ -704,9 +704,9 @@
           <th style="width:9%">Brand</th>
           <th style="width:7%">MODEL<br>CODE</th>
           <th style="width:17%" class="pi-left">SAIPL FG CODE</th>
-          <th style="width:20%" class="pi-left">PRODUCT MARKING REQUIRED BY CUSTOMER</th>
+          <th style="width:27%" class="pi-left">PRODUCT MARKING REQUIRED BY CUSTOMER</th>
+          {{!-- <th style="width:7%">Unit Weight<br>(+/- 2 kg)</th> --}}
           <th style="width:8%">HSN CODE</th>
-          <th style="width:7%">Unit Weight<br>(+/- 2 kg)</th>
           <th style="width:8%">ORDER QTY</th>
           <th style="width:7%">UNIT OF<br>MEASURE</th>
           <th style="width:7%">RATE PER UNIT</th>
@@ -717,9 +717,9 @@
           <th style="width:9%"></th>
           <th style="width:7%"></th>
           <th class="pi-left" style="width:17%"></th>
-          <th class="pi-left" style="width:20%"></th>
+          <th class="pi-left" style="width:27%"></th>
           <th style="width:8%"></th>
-          <th style="width:7%"></th>
+          {{!-- <th style="width:7%"></th> --}}
           <th style="width:8%"></th>
           <th style="width:7%">pieces / units / set etc</th>
           <th style="width:7%">{{invoice.currency}}</th>
@@ -735,7 +735,7 @@
           <td>{{fg_code}}<br>({{description}})</td>
           <td>{{marking}}</td>
           <td class="pi-center">{{hsn_code}}</td>
-          <td class="pi-right">{{weight}}</td>
+          {{!-- <td class="pi-right">{{weight}}</td> --}}
           <td class="pi-right">{{qty}}</td>
           <td class="pi-center">{{unit}}</td>
           <td class="pi-right">{{../invoice.currency_symbol}} {{rate}}</td>
@@ -748,7 +748,7 @@
           <td></td>
           <td></td>
           <td></td>
-          <td></td>
+          {{!-- <td></td> --}}
           <td></td>
           <td></td>
           <td></td>
@@ -759,35 +759,35 @@
         {{!-- SUMMARY --}}
         <tr class="pi-summary">
           <td colspan="4"></td>
-          <th colspan="2" class="pi-left">Number of Containers</th>
-          <td colspan="2" class="pi-right" style="width:14%">{{summary.containers}}</td>
-          <th colspan="2" class="pi-left" style="width:19%">INVOICE VALUE TOTAL</th>
+          <th colspan="1" class="pi-left">Number of Containers</th>
+          <td colspan="1" class="pi-right" style="width:14%">{{summary.containers}}</td>
+          <th colspan="3" class="pi-left" style="width:19%">INVOICE VALUE TOTAL</th>
           <td class="pi-right" style="width:12%">{{invoice.currency_symbol}} {{summary.invoice_total}}</td>
         </tr>
         <tr class="pi-summary">
           <td colspan="4"></td>
-          <th colspan="2" class="pi-left">Total Qty as per Proforma Invoice</th>
-          <td colspan="2" class="pi-right">{{summary.total_qty}}</td>
-          <th colspan="2" class="pi-left">Insurance</th>
+          <th colspan="1" class="pi-left">Total Qty as per Proforma Invoice</th>
+          <td colspan="1" class="pi-right">{{summary.total_qty}}</td>
+          <th colspan="3" class="pi-left">Insurance</th>
           <td class="pi-right">{{summary.insurance}}</td>
         </tr>
         <tr class="pi-summary">
           <td colspan="4"></td>
-          <th colspan="2" class="pi-left">Total Consignment Weight as per Proforma Invoice</th>
-          <td colspan="2" class="pi-right">{{summary.net_weight}}</td>
-          <th colspan="2" class="pi-left">Freight</th>
+          <th colspan="1" class="pi-left">Total Consignment Weight as per Proforma Invoice</th>
+          <td colspan="1" class="pi-right">{{summary.net_weight}}</td>
+          <th colspan="3" class="pi-left">Freight</th>
           <td class="pi-right">{{summary.freight}}</td>
         </tr>
         <tr class="pi-summary">
           <td colspan="4"></td>
-          <th colspan="2" class="pi-left">Total consignment Weight as per Proforma Invoice</th>
-          <td colspan="2" class="pi-right">{{summary.gross_weight}}</td>
-          <th colspan="2" class="pi-left">Less Advance Received</th>
+          <th colspan="1" class="pi-left">Total consignment Weight as per Proforma Invoice</th>
+          <td colspan="1" class="pi-right">{{summary.gross_weight}}</td>
+          <th colspan="3" class="pi-left">Less Advance Received</th>
           <td class="pi-right">{{summary.advance_received}}</td>
         </tr>
         <tr class="pi-summary">
-          <td colspan="8"></td>
-          <th colspan="2" class="pi-left">Total PI Value</th>
+          <td colspan="6"></td>
+          <th colspan="3" class="pi-left">Total PI Value</th>
           <td class="pi-right">{{invoice.currency_symbol}} {{summary.pi_total}}</td>
         </tr>
       </tbody>
@@ -871,7 +871,7 @@
     </table>
     <table class="pi-table pi-note">
       <tr>
-        <td style="width:58%">
+        <td style="width:55%">
           <div class="pi-label">Note</div>
           <div>- PRODUCT DESCRIPTIONS ON BATTERY IS MENTIONED AS PER CUSTOMER REQUIREMENT, IT MAY OR MAY NOT VARY THAN
             THE ACTUAL BATTERY DESCRIPTION.</div>
@@ -879,7 +879,7 @@
           <div>- SAIPL WILL NOT BE HELD RESPONSIBLE FOR ANY EXTRA CHARGES, DETENTION OR FINES APPLIED BY SHIPPING LINE.
           </div>
         </td>
-        <td class="pi-cert-text" style="width:42%">I hereby certify that this invoice shows the actual price of goods
+        <td class="pi-cert-text" style="width:45%">I hereby certify that this invoice shows the actual price of goods
           described, that no
           other invoice has been issued, and that all particulars are true and correct.</td>
       </tr>
@@ -897,10 +897,19 @@
           <div class="pi-for-sign">For {{exporter.name}}</div>
           <table class="pi-approval-table">
             <tr>
-              <td>CHECKED BY</td>
+
               <td>
+                <span style="padding-bottom: 10px !important ;">
+                  {{invoice.created_by}}
+                </span>
+                <br>
                 <span>
-                  MR.{{invoice.approved_by}}
+                  CREATED BY
+                </span>
+                </td>
+              <td>
+                <span style="padding-bottom: 10px !important ;">
+                  {{invoice.approved_by}}
                 </span>
                 <br>
                 <span>
