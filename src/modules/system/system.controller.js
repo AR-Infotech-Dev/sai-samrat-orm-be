@@ -1,48 +1,52 @@
-import * as CommonModel from "#shared/models/common.model.js";
-import { query, DB_PREFIX } from "#config/database.js";
-import { successResponse, failureResponse } from "#shared/utils/apiResponse.js";
-import { isSuperAdminRole as isSuperAdmin } from "#shared/utils/role.utils.js";
-import { getExchangeRates } from "./currency.service.js";
+import * as CommonModel from '#shared/models/common.model.js'
+import { query, DB_PREFIX } from '#config/database.js'
+import { successResponse, failureResponse } from '#shared/utils/apiResponse.js'
+import { isSuperAdminRole as isSuperAdmin } from '#shared/utils/role.utils.js'
+import { getExchangeRates } from './currency.service.js'
 
 // ======================================================
 // GET DEFINATIONS
 // ======================================================
 export const getDefinations = async (req, res) => {
   try {
-    let { table, menu_id } = req.body;
+    let { table, menu_id } = req.body
 
     if (!table) {
       if (!menu_id) {
         return failureResponse(res, {
           code: 2001,
           httpStatus: 400,
-          message: "menu_id is required",
-        });
+          message: 'menu_id is required'
+        })
       }
 
-      const moduleDetails = await CommonModel.getMasterDetails("menu_master", "*", { menu_id });
+      const moduleDetails = await CommonModel.getMasterDetails(
+        'menu_master',
+        '*',
+        { menu_id }
+      )
 
       if (!moduleDetails.length) {
         return failureResponse(res, {
           code: 2004,
           httpStatus: 404,
-          message: "Menu not found",
-        });
+          message: 'Menu not found'
+        })
       }
 
-      table = moduleDetails[0].table_name;
+      table = moduleDetails[0].table_name
     }
 
     if (!table) {
       return failureResponse(res, {
         code: 2001,
         httpStatus: 400,
-        message: "Table is required",
-      });
+        message: 'Table is required'
+      })
     }
 
-    const sql = `SHOW COLUMNS FROM ${DB_PREFIX}${table}`;
-    const rows = await query(sql);
+    const sql = `SHOW COLUMNS FROM ${DB_PREFIX}${table}`
+    const rows = await query(sql)
 
     if (rows.length) {
       return successResponse(res, {
@@ -50,137 +54,175 @@ export const getDefinations = async (req, res) => {
         httpStatus: 200,
         data: {
           data: rows
-        },
-      });
+        }
+      })
     }
 
     return failureResponse(res, {
       code: 2004,
       httpStatus: 404,
-      message: "No definitions found",
-    });
+      message: 'No definitions found'
+    })
   } catch (error) {
     return failureResponse(res, {
       code: 2008,
       httpStatus: 500,
-      message: error.message,
-    });
+      message: error.message
+    })
   }
-};
+}
 
 export const getCurrencyExchangeRates = async (req, res) => {
   try {
-    const rawCurrencies = req.query?.currencies || req.body?.currencies || "";
+    const rawCurrencies = req.query?.currencies || req.body?.currencies || ''
     const currencies = Array.isArray(rawCurrencies)
       ? rawCurrencies
-      : String(rawCurrencies || "")
-        .split(",")
-        .map((item) => item.trim())
-        .filter(Boolean);
+      : String(rawCurrencies || '')
+          .split(',')
+          .map(item => item.trim())
+          .filter(Boolean)
 
-    const data = await getExchangeRates(currencies.length ? currencies : undefined);
+    const data = await getExchangeRates(
+      currencies.length ? currencies : undefined
+    )
 
     return successResponse(res, {
       code: 1004,
       httpStatus: 200,
       data,
-      message: data.source === "cache" ? "Exchange rates loaded from today's cache" : "Exchange rates loaded",
-    });
+      message:
+        data.source === 'cache'
+          ? "Exchange rates loaded from today's cache"
+          : 'Exchange rates loaded'
+    })
   } catch (error) {
     return failureResponse(res, {
       code: 2008,
       httpStatus: 500,
-      message: error.message,
-    });
+      message: error.message
+    })
   }
-};
+}
 
 export const getFreeTextSearch = async (req, res) => {
   try {
-    const { text: searchText = "", type = "", tableName = "", wherec = "", list = "*", status = "false", isCompanyWise = false, require_customer = false } = req.body;
-    const text = String(searchText).trim();
-    const where = [];
-    const values = [];
+    const {
+      text: searchText = '',
+      type = '',
+      tableName = '',
+      wherec = '',
+      list = '*',
+      status = 'false',
+      isCompanyWise = false,
+      require_customer = false
+    } = req.body
+    const text = String(searchText).trim()
+    const where = []
+    const values = []
     const allowedFiltersByTable = {
-      customer: ["customer_type"],
-      proforma_invoices: ["customer_id", "order_type"],
-    };
+      customer: ['customer_type'],
+      proforma_invoices: ['customer_id', 'order_type']
+    }
 
-    if (tableName === "proforma_invoices" && require_customer && !req.body?.customer_id) {
+    if (
+      tableName === 'proforma_invoices' &&
+      require_customer &&
+      !req.body?.customer_id
+    ) {
       return successResponse(res, {
         code: 1004,
         httpStatus: 200,
         data: { data: [] },
-        message: "Select customer first"
-      });
+        message: 'Select customer first'
+      })
     }
 
     // ===============================
     // INPUT SEARCH
     // ===============================
-    if (type === "input") {
+    if (type === 'input') {
       if (!text) {
         return failureResponse(res, {
           code: 2001,
           httpStatus: 400,
-          message: "Search text required"
-        });
+          message: 'Search text required'
+        })
       }
 
-      const searchColumns = String(wherec || "")
-        .split(",")
-        .map((column) => column.trim())
-        .filter((column) => /^[a-zA-Z0-9_]+$/.test(column));
+      const searchColumns = String(wherec || '')
+        .split(',')
+        .map(column => column.trim())
+        .filter(column => /^[a-zA-Z0-9_]+$/.test(column))
 
       if (searchColumns.length) {
-        where.push(`(${searchColumns.map((column) => `t.${column} LIKE ?`).join(" OR ")})`);
-        values.push(...searchColumns.map(() => `%${text}%`));
+        where.push(
+          `(${searchColumns.map(column => `t.${column} LIKE ?`).join(' OR ')})`
+        )
+        values.push(...searchColumns.map(() => `%${text}%`))
       }
     }
 
     // ===============================
     // STATUS FILTER
     // ===============================
-    if (String(status) === "true") {
-      where.push(`t.status = ?`);
-      values.push("active");
+    if (String(status) === 'true') {
+      where.push(`t.status = ?`)
+      values.push('active')
     }
 
-    (allowedFiltersByTable[tableName] || []).forEach((filterKey) => {
-      const filterValue = req.body?.[filterKey];
-      if (filterValue === undefined || filterValue === null || filterValue === "") return;
-      where.push(`t.${filterKey} = ?`);
-      values.push(filterValue);
-    });
+    ;(allowedFiltersByTable[tableName] || []).forEach(filterKey => {
+      const filterValue = req.body?.[filterKey]
+      if (
+        filterValue === undefined ||
+        filterValue === null ||
+        filterValue === ''
+      )
+        return
+      where.push(`t.${filterKey} = ?`)
+      values.push(filterValue)
+    })
     // if (!isSuperAdmin(req.user) && ['customer', 'admin'].includes(tableName)) {
     //   where.push(`t.company_id = ${req.user.company_id} `);
     // }
-    
-    if (tableName === "categories") {
-      where.push(`t.is_parent = 'yes' `);
-    }
-    let select = list;
-    const join = [];
-    const other = {};
 
-    if (tableName === "proforma_invoices") {
+    if (tableName === 'categories') {
+      where.push(`t.is_parent = 'yes' `)
+    }
+    let select = list
+    const join = []
+    const other = {}
+
+    if (tableName === 'proforma_invoices') {
       select = `
         t.pi_id, t.pi_no, t.customer_id, cu.name AS customer_name,
         t.brand, t.order_type, t.pi_date, t.currency, t.exchange_rate,
         t.total_qty, t.total_value, t.gst_rate, t.pi_status
-      `;
-      join.push({ type: "LEFT JOIN", table: "customer", alias: "cu", key1: "customer_id", key2: "customer_id" });
-      where.push("t.status <> 'delete'");
-      where.push("t.pi_status = 'approved'");
+      `
+      join.push({
+        type: 'LEFT JOIN',
+        table: 'customer',
+        alias: 'cu',
+        key1: 'customer_id',
+        key2: 'customer_id'
+      })
+      where.push("t.status <> 'delete'")
+      where.push("t.pi_status = 'approved'")
       where.push(`EXISTS (
         SELECT 1 FROM ${DB_PREFIX}proforma_invoice_items pii
         WHERE pii.pi_id = t.pi_id AND pii.status <> 'delete' AND pii.qty > pii.booked_qty
-      )`);
-      other.orderBy = "t.pi_id";
-      other.order = "DESC";
+      )`)
+      other.orderBy = 't.pi_id'
+      other.order = 'DESC'
     }
 
-    const result = await CommonModel.GetMasterListDetails({ select, table: tableName, where, values, join, other });
+    const result = await CommonModel.GetMasterListDetails({
+      select,
+      table: tableName,
+      where,
+      values,
+      join,
+      other
+    })
     if (result.length) {
       return successResponse(res, {
         code: 1004,
@@ -188,7 +230,7 @@ export const getFreeTextSearch = async (req, res) => {
         data: {
           data: result
         }
-      });
+      })
     }
     return successResponse(res, {
       code: 1004,
@@ -196,60 +238,75 @@ export const getFreeTextSearch = async (req, res) => {
       data: {
         data: []
       },
-      message: "No records found"
-    });
-
+      message: 'No records found'
+    })
   } catch (error) {
     return failureResponse(res, {
       code: 2008,
       httpStatus: 500,
       message: error.message
-    });
+    })
   }
-};
+}
 export const getFreeTextAssignee = async (req, res) => {
   try {
-    const { text: searchText = "", type = "", tableName = "", wherec = "", list = "*", status = "false", isCompanyWise = false } = req.body;
-    const text = String(searchText).trim();
-    const where = [];
-    const values = [];
-    const join = [];
-    const other = {};
+    const {
+      text: searchText = '',
+      type = '',
+      tableName = '',
+      wherec = '',
+      list = '*',
+      status = 'false',
+      isCompanyWise = false
+    } = req.body
+    const text = String(searchText).trim()
+    const where = []
+    const values = []
+    const join = []
+    const other = {}
 
     // ===============================
     // INPUT SEARCH
     // ===============================
-    if (type === "input") {
+    if (type === 'input') {
       if (!text) {
         return failureResponse(res, {
           code: 2001,
           httpStatus: 400,
-          message: "Search text required"
-        });
+          message: 'Search text required'
+        })
       }
 
-      where.push(`t.${wherec} LIKE ?`);
-      values.push(`%${text}%`);
+      where.push(`t.${wherec} LIKE ?`)
+      values.push(`%${text}%`)
     }
 
     // ===============================
     // STATUS FILTER
     // ===============================
-    if (String(status) === "true") {
-      where.push(`t.status = ?`);
-      values.push("active");
+    if (String(status) === 'true') {
+      where.push(`t.status = ?`)
+      values.push('active')
     }
-    let sel = list.split(',')
+    let sel = list
+      .split(',')
       .map(item => `t.${item}`)
-      .join(',');
+      .join(',')
 
-    let select = sel;
+    let select = sel
 
-    if (tableName === "admin") {
-      select = `${select}`;
-      other.groupBy = "t.adminID";
+    if (tableName === 'admin') {
+      select = `${select}`
+      other.groupBy = 't.adminID'
     }
-    const result = await CommonModel.GetMasterListDetails({ select, table: tableName, where, values, join, other });
+    const result = await CommonModel.GetMasterListDetails({
+      select,
+      table: tableName,
+      where,
+      values,
+      join,
+      other
+    })
 
     if (result.length) {
       return successResponse(res, {
@@ -258,106 +315,97 @@ export const getFreeTextAssignee = async (req, res) => {
         data: {
           data: result
         }
-      });
+      })
     }
     return failureResponse(res, {
       code: 2004,
       httpStatus: 404,
-      message: "No records found"
-    });
-
+      message: 'No records found'
+    })
   } catch (error) {
     return failureResponse(res, {
       code: 2008,
       httpStatus: 500,
       message: error.message
-    });
+    })
   }
-};
+}
 
 // ======================================================
 // GET SLUG LIST
 // ======================================================
 export const getslugList = async (req, res) => {
   try {
-    const { slug = "", status = "", category_id = "", isCompanyWise = false } = req.body;
-    const where = [];
-    const values = [];
-    const join = [];
+    const {
+      slug = '',
+      status = '',
+      category_id = '',
+      isCompanyWise = false
+    } = req.body
+    const where = []
+    const values = []
+    const join = []
     const other = {
-      orderBy: "t.categories_index",
-      order: "ASC",
-    };
+      orderBy: 't.categories_index',
+      order: 'ASC'
+    }
 
     // ===============================
     // STATUS FILTER
     // ===============================
     if (status) {
-      const statusArr = String(status).split(",");
-      where.push(
-        `t.status IN (${statusArr.map(() => "?").join(",")})`
-      );
-      values.push(...statusArr);
+      const statusArr = String(status).split(',')
+      where.push(`t.status IN (${statusArr.map(() => '?').join(',')})`)
+      values.push(...statusArr)
     }
 
     // ===============================
     // SLUG FILTER
     // ===============================
     if (slug) {
-      const slugArr = String(slug).split(",");
-      where.push(
-        `t.slug IN (${slugArr.map(() => "?").join(",")})`
-      );
-      values.push(...slugArr);
+      const slugArr = String(slug).split(',')
+      where.push(`t.slug IN (${slugArr.map(() => '?').join(',')})`)
+      values.push(...slugArr)
     }
 
     // ===============================
     // CATEGORY ID FILTER
     // ===============================
     if (category_id) {
-      const catArr = String(category_id).split(",");
-      where.push(
-        `t.category_id IN (${catArr.map(() => "?").join(",")})`
-      );
-      values.push(...catArr);
+      const catArr = String(category_id).split(',')
+      where.push(`t.category_id IN (${catArr.map(() => '?').join(',')})`)
+      values.push(...catArr)
     }
 
     // ===============================
     // MAIN CATEGORY LIST
     // ===============================
-    const categoryDetails =
-      await CommonModel.GetMasterListDetails({
-        select:
-          "t.category_id,t.slug,t.categoryName,t.parent_id,t.is_parent,t.categories_index",
-        table: "categories",
-        where,
-        values,
-        join,
-        other,
-      });
+    const categoryDetails = await CommonModel.GetMasterListDetails({
+      select:
+        't.category_id,t.slug,t.categoryName,t.parent_id,t.is_parent,t.categories_index',
+      table: 'categories',
+      where,
+      values,
+      join,
+      other
+    })
 
     // ===============================
     // CHILD CATEGORY LIST
     // ===============================
-    const childW = [
-      "t.parent_id = ?",
-      "t.status = ?",
-    ];
+    const childW = ['t.parent_id = ?', 't.status = ?']
 
     for (const row of categoryDetails) {
-      const childV = [
-        row.category_id,
-        "active",
-      ];
-      row.sublist =
-        await CommonModel.GetMasterListDetails({
-          select: "t.category_id,t.slug,t.categoryName,t.parent_id,t.is_parent,t.categories_index,t.cat_color",
-          table: "categories",
-          where: childW,
-          values: childV,
-          join,
-          other,
-        });
+      const childV = [row.category_id, 'active']
+      row.sublist = await CommonModel.GetMasterListDetails({
+        select:
+          't.category_id,t.slug,t.categoryName,t.parent_id,t.is_parent,t.categories_index,t.cat_color',
+        table: 'categories',
+        where: childW,
+        values: childV,
+        join,
+        other
+      })
     }
 
     // ===============================
@@ -367,23 +415,22 @@ export const getslugList = async (req, res) => {
       return successResponse(res, {
         code: 1004,
         httpStatus: 200,
-        data: { data: categoryDetails },
-      });
+        data: { data: categoryDetails }
+      })
     }
 
     return failureResponse(res, {
       code: 2004,
       httpStatus: 404,
-      message: "No records found",
-    });
-
+      message: 'No records found'
+    })
   } catch (error) {
-    console.log(error);
+    console.log(error)
 
     return failureResponse(res, {
       code: 2008,
       httpStatus: 500,
-      message: error.message,
-    });
+      message: error.message
+    })
   }
-};
+}

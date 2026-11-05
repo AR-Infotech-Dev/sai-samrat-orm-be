@@ -1,184 +1,234 @@
-import * as CommonModel from "#shared/models/common.model.js";
-import { query, DB_PREFIX } from "#config/database.js";
-import { successResponse, failureResponse } from "#shared/utils/apiResponse.js";
-import { prepareFilterData } from "#shared/utils/filter.builder.js";
-import { toMysqlDateTime } from "#shared/utils/dateTime.js";
-import { env } from "#config/env.js";
-import { renderTemplate } from "#shared/utils/templateMaker.js";
-import { renderProformaPdf } from "./proforma-pdf.service.js";
-import { withPiWriteLock } from "./pi-lifecycle.model.js";
+import * as CommonModel from '#shared/models/common.model.js'
+import { query, DB_PREFIX } from '#config/database.js'
+import { successResponse, failureResponse } from '#shared/utils/apiResponse.js'
+import { prepareFilterData } from '#shared/utils/filter.builder.js'
+import { toMysqlDateTime } from '#shared/utils/dateTime.js'
+import { env } from '#config/env.js'
+import { renderTemplate } from '#shared/utils/templateMaker.js'
+import { renderProformaPdf } from './proforma-pdf.service.js'
+import { withPiWriteLock } from './pi-lifecycle.model.js'
 
-const MODULE_TABLE = "proforma_invoices";
-const PI_ITEMS_TABLE = "proforma_invoice_items";
+const MODULE_TABLE = 'proforma_invoices'
+const PI_ITEMS_TABLE = 'proforma_invoice_items'
 
 const toNumber = (value, fallback = 0) => {
-  const numericValue = Number(value);
-  return Number.isFinite(numericValue) ? numericValue : fallback;
-};
+  const numericValue = Number(value)
+  return Number.isFinite(numericValue) ? numericValue : fallback
+}
 
-const roundNumber = (value) => Math.round(toNumber(value));
+const roundNumber = value => Math.round(toNumber(value))
 
-const emptyText = "-";
+const emptyText = '-'
 const pickText = (...values) => {
   for (const value of values) {
-    if (value !== undefined && value !== null && String(value).trim() !== "") {
-      return String(value).trim();
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      return String(value).trim()
     }
   }
-  return emptyText;
-};
+  return emptyText
+}
 
 const validatePiItems = (items = []) => {
-  if (!Array.isArray(items) || !items.length) return "At least one item is required";
-  const missingBrandIndex = items.findIndex((item) => !String(item.brand || "").trim());
-  if (missingBrandIndex >= 0) return `Brand is required for PI item ${missingBrandIndex + 1}`;
-  return "";
-};
+  if (!Array.isArray(items) || !items.length)
+    return 'At least one item is required'
+  const missingBrandIndex = items.findIndex(
+    item => !String(item.brand || '').trim()
+  )
+  if (missingBrandIndex >= 0)
+    return `Brand is required for PI item ${missingBrandIndex + 1}`
+  return ''
+}
 
-const formatDate = (value) => {
-  if (!value) return emptyText;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10);
-  return date.toLocaleDateString("en-GB").replace(/\//g, "-");
-};
+const formatDate = value => {
+  if (!value) return emptyText
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value).slice(0, 10)
+  return date.toLocaleDateString('en-GB').replace(/\//g, '-')
+}
 
-const formatQty = (value, digits = 0) => roundNumber(value).toLocaleString("en-IN", {
-  minimumFractionDigits: digits,
-  maximumFractionDigits: digits,
-});
+const formatQty = (value, digits = 0) =>
+  roundNumber(value).toLocaleString('en-IN', {
+    minimumFractionDigits: digits,
+    maximumFractionDigits: digits
+  })
 
-const formatMoney = (value) => roundNumber(value).toLocaleString("en-IN", {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-});
+const formatMoney = value =>
+  roundNumber(value).toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  })
 
-const ones = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
-const tens = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
+const ones = [
+  '',
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'eleven',
+  'twelve',
+  'thirteen',
+  'fourteen',
+  'fifteen',
+  'sixteen',
+  'seventeen',
+  'eighteen',
+  'nineteen'
+]
+const tens = [
+  '',
+  '',
+  'twenty',
+  'thirty',
+  'forty',
+  'fifty',
+  'sixty',
+  'seventy',
+  'eighty',
+  'ninety'
+]
 
-const wordsBelowThousand = (num) => {
-  let n = Math.floor(Number(num) || 0);
-  const parts = [];
+const wordsBelowThousand = num => {
+  let n = Math.floor(Number(num) || 0)
+  const parts = []
   if (n >= 100) {
-    parts.push(`${ones[Math.floor(n / 100)]} hundred`);
-    n %= 100;
+    parts.push(`${ones[Math.floor(n / 100)]} hundred`)
+    n %= 100
   }
   if (n >= 20) {
-    parts.push(tens[Math.floor(n / 10)]);
-    n %= 10;
+    parts.push(tens[Math.floor(n / 10)])
+    n %= 10
   }
-  if (n > 0) parts.push(ones[n]);
-  return parts.join(" ");
-};
+  if (n > 0) parts.push(ones[n])
+  return parts.join(' ')
+}
 
-const amountToWords = (amount, currency = "USD") => {
-  let n = Math.round(toNumber(amount));
-  if (!n) return `${currency} zero only`.toUpperCase();
+const amountToWords = (amount, currency = 'USD') => {
+  let n = Math.round(toNumber(amount))
+  if (!n) return `${currency} zero only`.toUpperCase()
   const units = [
-    { value: 10000000, label: "crore" },
-    { value: 100000, label: "lakh" },
-    { value: 1000, label: "thousand" },
-    { value: 1, label: "" },
-  ];
-  const words = [];
+    { value: 10000000, label: 'crore' },
+    { value: 100000, label: 'lakh' },
+    { value: 1000, label: 'thousand' },
+    { value: 1, label: '' }
+  ]
+  const words = []
   for (const unit of units) {
-    const count = Math.floor(n / unit.value);
-    if (!count) continue;
-    words.push(`${wordsBelowThousand(count)} ${unit.label}`.trim());
-    n %= unit.value;
+    const count = Math.floor(n / unit.value)
+    if (!count) continue
+    words.push(`${wordsBelowThousand(count)} ${unit.label}`.trim())
+    n %= unit.value
   }
-  return `${currency} ${words.join(" ")} only`.replace(/\s+/g, " ").toUpperCase();
-};
+  return `${currency} ${words.join(' ')} only`
+    .replace(/\s+/g, ' ')
+    .toUpperCase()
+}
 
-const default_columns = {};
+const default_columns = {}
 const custom_columns = {
   customer_id: {
-    table: "customer",
-    alias: "cu",
-    column: "name",
-    key2: "customer_id",
-    select: "cu.mobile_no AS customer_mobile, cu.email AS customer_email, cu.address AS customer_address, cu.gst_number AS customer_gst",
+    table: 'customer',
+    alias: 'cu',
+    column: 'name',
+    key2: 'customer_id',
+    select:
+      'cu.mobile_no AS customer_mobile, cu.email AS customer_email, cu.address AS customer_address, cu.gst_number AS customer_gst'
   },
   pi_status: {
-    table: "categories",
-    alias: "ct",
-    column: "categoryName",
-    key2: "slug",
-    select: "ct.cat_color as pi_status_color, t.pi_status AS pi_status_code",
+    table: 'categories',
+    alias: 'ct',
+    column: 'categoryName',
+    key2: 'slug',
+    select: 'ct.cat_color as pi_status_color, t.pi_status AS pi_status_code'
   },
   priority: {
-    table: "categories",
-    alias: "cp",
-    column: "categoryName",
-    key2: "slug",
-    select: "cp.cat_color as priority_color",
-  },
-};
+    table: 'categories',
+    alias: 'cp',
+    column: 'categoryName',
+    key2: 'slug',
+    select: 'cp.cat_color as priority_color'
+  }
+}
 
-const buildPiNo = async (piDate) => {
-  const date = piDate ? new Date(piDate) : new Date();
-  const year = date.getFullYear();
-  const fyStart = date.getMonth() >= 3 ? year : year - 1;
-  const fyEnd = (fyStart + 1).toString().slice(-2);
-  const fyPrefix = `SAIPL/PI/${fyStart.toString().slice(-2)}-${fyEnd}`;
+const buildPiNo = async piDate => {
+  const date = piDate ? new Date(piDate) : new Date()
+  const year = date.getFullYear()
+  const fyStart = date.getMonth() >= 3 ? year : year - 1
+  const fyEnd = (fyStart + 1).toString().slice(-2)
+  const fyPrefix = `SAIPL/PI/${fyStart.toString().slice(-2)}-${fyEnd}`
 
   const rows = await query(
     `SELECT pi_no FROM ${DB_PREFIX}${MODULE_TABLE} WHERE pi_no LIKE ? AND status <> 'delete'`,
     [`${fyPrefix}/%`]
-  );
+  )
 
-  let maxNo = 0;
+  let maxNo = 0
   for (const row of rows) {
-    const match = String(row.pi_no || "").match(new RegExp(`^${fyPrefix.replace(/\//g, "\\/")}/(\\d+)$`, "i"));
+    const match = String(row.pi_no || '').match(
+      new RegExp(`^${fyPrefix.replace(/\//g, '\\/')}/(\\d+)$`, 'i')
+    )
     if (match) {
-      maxNo = Math.max(maxNo, Number(match[1]) || 0);
+      maxNo = Math.max(maxNo, Number(match[1]) || 0)
     }
   }
 
-  const nextSeq = String(maxNo + 1).padStart(3, "0");
-  return `${fyPrefix}/${nextSeq}`;
-};
+  const nextSeq = String(maxNo + 1).padStart(3, '0')
+  return `${fyPrefix}/${nextSeq}`
+}
 
 export const list = async (req, res) => {
   try {
-    const { page = 1, searchText = "", getAll = "N", orderBy = "created_date", order = "DESC", filters = [] } = req.body;
-    const limit = env.perPage;
-    const currentPage = Number(page) || 1;
-    const start = (currentPage - 1) * limit;
+    const {
+      page = 1,
+      searchText = '',
+      getAll = 'N',
+      orderBy = 'created_date',
+      order = 'DESC',
+      filters = []
+    } = req.body
+    const limit = env.perPage
+    const currentPage = Number(page) || 1
+    const start = (currentPage - 1) * limit
 
     const filterData = prepareFilterData({
       filters,
       searchText,
       other: { orderBy, order, searchColumns: [] },
       default_columns,
-      custom_columns,
-    });
+      custom_columns
+    })
 
-    const { select, where, values, join, other } = filterData;
-    where.push("t.status <> 'delete'");
-    other.freeTextSearch = searchText;
-    other.searchColumns = ["t.pi_no", "t.brand"];
+    const { select, where, values, join, other } = filterData
+    where.push("t.status <> 'delete'")
+    other.freeTextSearch = searchText
+    other.searchColumns = ['t.pi_no', 't.brand']
 
     const total = await CommonModel.getCountsByParameter({
       table: MODULE_TABLE,
       where,
       values,
       join,
-      other,
-    });
+      other
+    })
 
-    const totalPages = Math.ceil(total / limit);
-    const end = Math.min(start + limit, total);
+    const totalPages = Math.ceil(total / limit)
+    const end = Math.min(start + limit, total)
 
     const piList = await CommonModel.GetMasterListDetails({
       select,
       table: MODULE_TABLE,
       where,
       values,
-      limit: getAll === "Y" ? "" : limit,
+      limit: getAll === 'Y' ? '' : limit,
       start,
       join,
-      other,
-    });
+      other
+    })
 
     return successResponse(res, {
       code: 1004,
@@ -191,21 +241,30 @@ export const list = async (req, res) => {
           limit,
           totalPages,
           start: total === 0 ? 0 : start + 1,
-          end,
-        },
-      },
-    });
+          end
+        }
+      }
+    })
   } catch (error) {
-    return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message
+    })
   }
-};
+}
 
 export const activeList = async (req, res) => {
   try {
-    const { customer_id = null, text = "", searchText = "", require_customer = false } = req.body || {};
-    const keyword = String(text || searchText || "").trim();
+    const {
+      customer_id = null,
+      text = '',
+      searchText = '',
+      require_customer = false
+    } = req.body || {}
+    const keyword = String(text || searchText || '').trim()
     if (require_customer && !customer_id) {
-      return successResponse(res, { code: 1004, httpStatus: 200, data: [] });
+      return successResponse(res, { code: 1004, httpStatus: 200, data: [] })
     }
 
     let sql = `
@@ -219,33 +278,41 @@ export const activeList = async (req, res) => {
           SELECT 1 FROM ${DB_PREFIX}${PI_ITEMS_TABLE} pii
           WHERE pii.pi_id = pi.pi_id AND pii.status <> 'delete' AND pii.qty > pii.booked_qty
         )
-    `;
-    const params = [];
+    `
+    const params = []
 
     if (customer_id) {
-      sql += " AND pi.customer_id = ?";
-      params.push(Number(customer_id));
+      sql += ' AND pi.customer_id = ?'
+      params.push(Number(customer_id))
     }
 
     if (keyword) {
-      sql += " AND (pi.pi_no LIKE ? OR cu.name LIKE ?)";
-      params.push(`%${keyword}%`, `%${keyword}%`);
+      sql += ' AND (pi.pi_no LIKE ? OR cu.name LIKE ?)'
+      params.push(`%${keyword}%`, `%${keyword}%`)
     }
 
-    sql += " ORDER BY pi.pi_id DESC";
-    const rows = await query(sql, params);
+    sql += ' ORDER BY pi.pi_id DESC'
+    const rows = await query(sql, params)
 
-    return successResponse(res, { code: 1004, httpStatus: 200, data: rows });
+    return successResponse(res, { code: 1004, httpStatus: 200, data: rows })
   } catch (error) {
-    return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message
+    })
   }
-};
+}
 
 export const getItems = async (req, res) => {
   try {
-    const { id: pi_id } = req.params;
+    const { id: pi_id } = req.params
     if (!pi_id) {
-      return failureResponse(res, { code: 2004, httpStatus: 400, message: "PI ID is required" });
+      return failureResponse(res, {
+        code: 2004,
+        httpStatus: 400,
+        message: 'PI ID is required'
+      })
     }
 
     const items = await query(
@@ -257,63 +324,103 @@ export const getItems = async (req, res) => {
        WHERE pii.pi_id = ? AND pii.status <> 'delete'
        ORDER BY pii.pi_item_id ASC`,
       [pi_id]
-    );
+    )
 
-    return successResponse(res, { code: 1004, httpStatus: 200, data: { data: items } });
+    return successResponse(res, {
+      code: 1004,
+      httpStatus: 200,
+      data: { data: items }
+    })
   } catch (error) {
-    return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message
+    })
   }
-};
+}
 
 export const getDetails = async (req, res) => {
   try {
-    if (req.method.toUpperCase() === "POST") return await withPiWriteLock(req.params.id, () => getDetailsInternal(req, res));
-    return await getDetailsInternal(req, res);
+    if (req.method.toUpperCase() === 'POST')
+      return await withPiWriteLock(req.params.id, () =>
+        getDetailsInternal(req, res)
+      )
+    return await getDetailsInternal(req, res)
   } catch (error) {
-    return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message
+    })
   }
-};
+}
 
 const getDetailsInternal = async (req, res) => {
   try {
-    const method = req.method.toUpperCase();
-    const { id: pi_id = null } = req.params;
-    const userId = req.user?.adminID || 1;
+    const method = req.method.toUpperCase()
+    const { id: pi_id = null } = req.params
+    const userId = req.user?.adminID || 1
 
     switch (method) {
-      case "PUT": {
-        const payload = req.body || {};
-        const piData = payload.proforma || payload.pi || payload;
-        const items = Array.isArray(payload.items) ? payload.items : [];
+      case 'PUT': {
+        const payload = req.body || {}
+        const piData = payload.proforma || payload.pi || payload
+        const items = Array.isArray(payload.items) ? payload.items : []
 
         if (!piData.customer_id) {
-          return failureResponse(res, { code: 2001, httpStatus: 400, message: "Customer is required" });
+          return failureResponse(res, {
+            code: 2001,
+            httpStatus: 400,
+            message: 'Customer is required'
+          })
         }
         if (!items.length) {
-          return failureResponse(res, { code: 2001, httpStatus: 400, message: "At least one item is required" });
+          return failureResponse(res, {
+            code: 2001,
+            httpStatus: 400,
+            message: 'At least one item is required'
+          })
         }
-        const itemValidationError = validatePiItems(items);
+        const itemValidationError = validatePiItems(items)
         if (itemValidationError) {
-          return failureResponse(res, { code: 2001, httpStatus: 400, message: itemValidationError });
+          return failureResponse(res, {
+            code: 2001,
+            httpStatus: 400,
+            message: itemValidationError
+          })
         }
 
-        const pi_no = piData.pi_no?.trim() || await buildPiNo(piData.pi_date);
-
-        const gstRate = toNumber(piData.gst_rate, 18);
-        const exchangeRate = Number(piData.exchange_rate || 1) || 1;
-        const roundedItems = items.map((item) => {
-          const qty = roundNumber(item.qty);
-          const unitRate = roundNumber(item.unit_rate || item.unitRate);
-          const weight = roundNumber(item.weight);
-          const unitRateInInr = roundNumber(item.unit_rate_in_inr || item.unitRateInInr || (exchangeRate ? unitRate / exchangeRate : unitRate));
-          const lineGst = toNumber(item.gst ?? item.gst_rate, gstRate);
-          const taxable = qty * unitRate;
-          const lineVal = roundNumber(taxable + (taxable * (lineGst / 100)));
-          return { ...item, qty, unitRate, weight, unitRateInInr, lineGst, lineVal };
-        });
-        const totalQty = roundedItems.reduce((sum, it) => sum + it.qty, 0);
-        const totalValue = roundedItems.reduce((sum, it) => sum + it.lineVal, 0);
-        const totalValueInInr = roundNumber(piData.currency === "INR" ? totalValue : totalValue / exchangeRate);
+        const pi_no = piData.pi_no?.trim() || (await buildPiNo(piData.pi_date))
+        const gstRate = toNumber(piData.gst_rate, 18)
+        const exchangeRate = Number(piData.exchange_rate || 1) || 1
+        const roundedItems = items.map(item => {
+          const qty = roundNumber(item.qty)
+          const unitRate = roundNumber(item.unit_rate || item.unitRate)
+          const weight = roundNumber(item.weight)
+          const unitRateInInr = roundNumber(
+            item.unit_rate_in_inr ||
+              item.unitRateInInr ||
+              (exchangeRate ? unitRate / exchangeRate : unitRate)
+          )
+          const lineGst = toNumber(item.gst ?? item.gst_rate, gstRate)
+          const taxable = qty * unitRate
+          const lineVal = roundNumber(taxable + taxable * (lineGst / 100))
+          return {
+            ...item,
+            qty,
+            unitRate,
+            weight,
+            unitRateInInr,
+            lineGst,
+            lineVal
+          }
+        })
+        const totalQty = roundedItems.reduce((sum, it) => sum + it.qty, 0)
+        const totalValue = roundedItems.reduce((sum, it) => sum + it.lineVal, 0)
+        const totalValueInInr = roundNumber(
+          piData.currency === 'INR' ? totalValue : totalValue / exchangeRate
+        )
 
         const data = {
           pi_no,
@@ -322,13 +429,13 @@ const getDetailsInternal = async (req, res) => {
           brand: piData.brand || null,
           pi_date: piData.pi_date || toMysqlDateTime().slice(0, 10),
           valid_until: piData.valid_until || null,
-          order_type: piData.order_type || "domestic",
-          pi_status: piData.pi_status === "waiting" ? "waiting" : "draft",
-          priority: piData.priority || "normal",
+          order_type: piData.order_type || 'domestic',
+          pi_status: piData.pi_status === 'waiting' ? 'waiting' : 'draft',
+          priority: piData.priority || 'normal',
           total_qty: totalQty,
           total_value: totalValue,
           gst_rate: gstRate,
-          currency: piData.currency || "INR",
+          currency: piData.currency || 'INR',
           exchange_rate: exchangeRate,
           total_value_in_inr: totalValueInInr,
           payment_terms: piData.payment_terms || null,
@@ -344,11 +451,14 @@ const getDetailsInternal = async (req, res) => {
           remarks: piData.remarks || null,
           created_by: userId,
           created_date: toMysqlDateTime(),
-          status: "active",
-        };
+          status: 'active'
+        }
 
-        const result = await CommonModel.saveMasterDetails({ table: MODULE_TABLE, data });
-        const insertedPiId = result.insertId;
+        const result = await CommonModel.saveMasterDetails({
+          table: MODULE_TABLE,
+          data
+        })
+        const insertedPiId = result.insertId
 
         for (const item of roundedItems) {
           await CommonModel.saveMasterDetails({
@@ -357,9 +467,11 @@ const getDetailsInternal = async (req, res) => {
               pi_id: insertedPiId,
               company_id: data.company_id,
               product_id: Number(item.product_id),
-              product_code_snapshot: item.product_code || item.productCode || null,
+              product_code_snapshot:
+                item.product_code || item.productCode || null,
               product_name_snapshot: item.product_name || item.product || null,
-              product_marking: item.product_marking || item.product_marking_snapshot || null,
+              product_marking:
+                item.product_marking || item.product_marking_snapshot || null,
               brand_snapshot: item.brand || null,
               model: item.model || null,
               weight: item.weight,
@@ -372,67 +484,103 @@ const getDetailsInternal = async (req, res) => {
               gst_rate: item.lineGst,
               created_by: userId,
               created_date: toMysqlDateTime(),
-              status: "active",
-            },
-          });
+              status: 'active'
+            }
+          })
         }
 
         return successResponse(res, {
           code: 1001,
           httpStatus: 201,
           data: { pi_id: insertedPiId, pi_no },
-          message: "Proforma Invoice created successfully",
-        });
+          message: 'Proforma Invoice created successfully'
+        })
       }
 
-      case "POST": {
+      case 'POST': {
         if (!pi_id) {
-          return failureResponse(res, { code: 2004, httpStatus: 404, message: "PI ID not found" });
+          return failureResponse(res, {
+            code: 2004,
+            httpStatus: 404,
+            message: 'PI ID not found'
+          })
         }
 
-        const currentPi = await query(`SELECT pi_status FROM ${DB_PREFIX}${MODULE_TABLE} WHERE pi_id = ? AND status <> 'delete'`, [pi_id]);
-        if (!currentPi.length) return failureResponse(res, { code: 2004, httpStatus: 404, message: "PI not found" });
-        if (currentPi[0].pi_status !== "draft") return failureResponse(res, { code: 2001, httpStatus: 409, message: "Only Draft PIs can be updated" });
+        const currentPi = await query(
+          `SELECT pi_status FROM ${DB_PREFIX}${MODULE_TABLE} WHERE pi_id = ? AND status <> 'delete'`,
+          [pi_id]
+        )
+        if (!currentPi.length)
+          return failureResponse(res, {
+            code: 2004,
+            httpStatus: 404,
+            message: 'PI not found'
+          })
+        if (currentPi[0].pi_status !== 'draft')
+          return failureResponse(res, {
+            code: 2001,
+            httpStatus: 409,
+            message: 'Only Draft PIs can be updated'
+          })
 
-        const payload = req.body || {};
-        const piData = payload.proforma || payload.pi || payload;
-        const items = Array.isArray(payload.items) ? payload.items : [];
+        const payload = req.body || {}
+        const piData = payload.proforma || payload.pi || payload
+        const items = Array.isArray(payload.items) ? payload.items : []
         if (items.length > 0) {
-          const itemValidationError = validatePiItems(items);
+          const itemValidationError = validatePiItems(items)
           if (itemValidationError) {
-            return failureResponse(res, { code: 2001, httpStatus: 400, message: itemValidationError });
+            return failureResponse(res, {
+              code: 2001,
+              httpStatus: 400,
+              message: itemValidationError
+            })
           }
         }
 
-        const gstRate = toNumber(piData.gst_rate, 18);
-        const exchangeRate = Number(piData.exchange_rate || 1) || 1;
-        const roundedItems = items.map((item) => {
-          const qty = roundNumber(item.qty);
-          const unitRate = roundNumber(item.unit_rate || item.unitRate);
-          const weight = roundNumber(item.weight);
-          const bookedQty = roundNumber(item.booked_qty);
-          const unitRateInInr = roundNumber(item.unit_rate_in_inr || item.unitRateInInr || (exchangeRate ? unitRate / exchangeRate : unitRate));
-          const lineGst = toNumber(item.gst ?? item.gst_rate, gstRate);
-          const taxable = qty * unitRate;
-          const lineVal = roundNumber(taxable + (taxable * (lineGst / 100)));
-          return { ...item, qty, bookedQty, unitRate, weight, unitRateInInr, lineGst, lineVal };
-        });
-        const totalQty = roundedItems.reduce((sum, it) => sum + it.qty, 0);
-        const totalValue = roundedItems.reduce((sum, it) => sum + it.lineVal, 0);
-        const totalValueInInr = roundNumber(piData.currency === "INR" ? totalValue : totalValue / exchangeRate);
+        const gstRate = toNumber(piData.gst_rate, 18)
+        const exchangeRate = Number(piData.exchange_rate || 1) || 1
+        const roundedItems = items.map(item => {
+          const qty = roundNumber(item.qty)
+          const unitRate = roundNumber(item.unit_rate || item.unitRate)
+          const weight = roundNumber(item.weight)
+          const bookedQty = roundNumber(item.booked_qty)
+          const unitRateInInr = roundNumber(
+            item.unit_rate_in_inr ||
+              item.unitRateInInr ||
+              (exchangeRate ? unitRate / exchangeRate : unitRate)
+          )
+          const lineGst = toNumber(item.gst ?? item.gst_rate, gstRate)
+          const taxable = qty * unitRate
+          const lineVal = roundNumber(taxable + taxable * (lineGst / 100))
+          return {
+            ...item,
+            qty,
+            bookedQty,
+            unitRate,
+            weight,
+            unitRateInInr,
+            lineGst,
+            lineVal
+          }
+        })
+        const totalQty = roundedItems.reduce((sum, it) => sum + it.qty, 0)
+        const totalValue = roundedItems.reduce((sum, it) => sum + it.lineVal, 0)
+        const totalValueInInr = roundNumber(
+          piData.currency === 'INR' ? totalValue : totalValue / exchangeRate
+        )
 
         const updateData = {
           customer_id: Number(piData.customer_id),
           brand: piData.brand || null,
           pi_date: piData.pi_date,
           valid_until: piData.valid_until || null,
-          order_type: piData.order_type || "domestic",
-          pi_status: piData.pi_status === "waiting" ? "waiting" : "draft",
-          priority: piData.priority || "normal",
+          order_type: piData.order_type || 'domestic',
+          pi_status: piData.pi_status === 'waiting' ? 'waiting' : 'draft',
+          priority: piData.priority || 'normal',
           total_qty: totalQty,
           total_value: totalValue,
           gst_rate: gstRate,
-          currency: piData.currency || "INR",
+          currency: piData.currency || 'INR',
           exchange_rate: exchangeRate,
           total_value_in_inr: totalValueInInr,
           payment_terms: piData.payment_terms || null,
@@ -447,19 +595,22 @@ const getDetailsInternal = async (req, res) => {
           final_destination: piData.final_destination || null,
           remarks: piData.remarks || null,
           modified_by: userId,
-          modified_date: toMysqlDateTime(),
-        };
+          modified_date: toMysqlDateTime()
+        }
 
-        if (piData.pi_no) updateData.pi_no = piData.pi_no;
+        if (piData.pi_no) updateData.pi_no = piData.pi_no
 
         await CommonModel.updateMasterDetails({
           table: MODULE_TABLE,
           data: updateData,
-          where: { pi_id },
-        });
+          where: { pi_id }
+        })
 
         if (items.length > 0) {
-          await CommonModel.deleteMasterDetails({ table: PI_ITEMS_TABLE, where: { pi_id } });
+          await CommonModel.deleteMasterDetails({
+            table: PI_ITEMS_TABLE,
+            where: { pi_id }
+          })
 
           for (const item of roundedItems) {
             await CommonModel.saveMasterDetails({
@@ -468,9 +619,12 @@ const getDetailsInternal = async (req, res) => {
                 pi_id,
                 company_id: piData.company_id || 0,
                 product_id: Number(item.product_id),
-                product_code_snapshot: item.product_code || item.productCode || null,
-                product_name_snapshot: item.product_name || item.product || null,
-                product_marking: item.product_marking || item.product_marking_snapshot || null,
+                product_code_snapshot:
+                  item.product_code || item.productCode || null,
+                product_name_snapshot:
+                  item.product_name || item.product || null,
+                product_marking:
+                  item.product_marking || item.product_marking_snapshot || null,
                 brand_snapshot: item.brand || null,
                 model: item.model || null,
                 weight: item.weight,
@@ -483,9 +637,9 @@ const getDetailsInternal = async (req, res) => {
                 gst_rate: item.lineGst,
                 created_by: userId,
                 created_date: toMysqlDateTime(),
-                status: "active",
-              },
-            });
+                status: 'active'
+              }
+            })
           }
         }
 
@@ -493,14 +647,18 @@ const getDetailsInternal = async (req, res) => {
           code: 1002,
           httpStatus: 200,
           data: { pi_id },
-          message: "Proforma Invoice updated successfully",
-        });
+          message: 'Proforma Invoice updated successfully'
+        })
       }
 
-      case "GET":
+      case 'GET':
       default: {
         if (!pi_id) {
-          return failureResponse(res, { code: 2004, httpStatus: 404, message: "PI ID not found" });
+          return failureResponse(res, {
+            code: 2004,
+            httpStatus: 404,
+            message: 'PI ID not found'
+          })
         }
 
         const piRows = await query(
@@ -517,10 +675,14 @@ const getDetailsInternal = async (req, res) => {
            LEFT JOIN ${DB_PREFIX}customer cu ON pi.customer_id = cu.customer_id
            WHERE pi.pi_id = ? AND pi.status <> 'delete'`,
           [pi_id]
-        );
+        )
 
         if (!piRows.length) {
-          return failureResponse(res, { code: 2004, httpStatus: 404, message: "PI not found" });
+          return failureResponse(res, {
+            code: 2004,
+            httpStatus: 404,
+            message: 'PI not found'
+          })
         }
 
         const items = await query(
@@ -530,42 +692,64 @@ const getDetailsInternal = async (req, res) => {
            WHERE pii.pi_id = ? AND pii.status <> 'delete'
            ORDER BY pii.pi_item_id ASC`,
           [pi_id]
-        );
+        )
 
         return successResponse(res, {
           code: 1004,
           httpStatus: 200,
-          data: { data: { ...piRows[0], items } },
-        });
+          data: { data: { ...piRows[0], items } }
+        })
       }
     }
   } catch (error) {
-    return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message
+    })
   }
-};
+}
 
 export const changeStatus = async (req, res) => {
   try {
-    const { action = "delete", ids = [] } = req.body;
+    const { action = 'delete', ids = [] } = req.body
     if (!Array.isArray(ids) || !ids.length) {
-      return failureResponse(res, { code: 2001, httpStatus: 400, message: "No IDs provided" });
+      return failureResponse(res, {
+        code: 2001,
+        httpStatus: 400,
+        message: 'No IDs provided'
+      })
     }
 
-    if (action === "delete") {
-      const placeholders = ids.map(() => "?").join(",");
-      await query(`UPDATE ${DB_PREFIX}${MODULE_TABLE} SET status = 'delete' WHERE pi_id IN (${placeholders})`, ids);
-      await query(`UPDATE ${DB_PREFIX}${PI_ITEMS_TABLE} SET status = 'delete' WHERE pi_id IN (${placeholders})`, ids);
+    if (action === 'delete') {
+      const placeholders = ids.map(() => '?').join(',')
+      await query(
+        `UPDATE ${DB_PREFIX}${MODULE_TABLE} SET status = 'delete' WHERE pi_id IN (${placeholders})`,
+        ids
+      )
+      await query(
+        `UPDATE ${DB_PREFIX}${PI_ITEMS_TABLE} SET status = 'delete' WHERE pi_id IN (${placeholders})`,
+        ids
+      )
     }
 
-    return successResponse(res, { code: 1003, httpStatus: 200, message: "PI updated successfully" });
+    return successResponse(res, {
+      code: 1003,
+      httpStatus: 200,
+      message: 'PI updated successfully'
+    })
   } catch (error) {
-    return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message
+    })
   }
-};
+}
 
 export const preview = async (req, res) => {
   try {
-    const { id: pi_id } = req.params;
+    const { id: pi_id } = req.params
     const piRows = await query(
       `SELECT pi.*,
               cu.name AS customer_name,
@@ -584,13 +768,17 @@ export const preview = async (req, res) => {
        LEFT JOIN ${DB_PREFIX}admin cb ON pi.created_by = au.adminID
        WHERE pi.pi_id = ? AND pi.status <> 'delete'`,
       [pi_id]
-    );
+    )
 
     if (!piRows.length) {
-      return failureResponse(res, { code: 2004, httpStatus: 404, message: "PI not found" });
+      return failureResponse(res, {
+        code: 2004,
+        httpStatus: 404,
+        message: 'PI not found'
+      })
     }
 
-    const pi = piRows[0];
+    const pi = piRows[0]
     const items = await query(
       `SELECT pii.*,
               p.product_code,
@@ -606,72 +794,96 @@ export const preview = async (req, res) => {
        WHERE pii.pi_id = ? AND pii.status <> 'delete'
        ORDER BY pii.pi_item_id ASC`,
       [pi_id]
-    );
+    )
 
-    const currency = pi.currency || "INR";
-    const totalQty = items.reduce((total, it) => total + Number(it.qty || 0), 0);
-    const totalWeight = items.reduce((total, it) => total + (Number(it.qty || 0) * Number(it.weight || it.product_weight || 0)), 0);
-    const invoiceTotal = items.reduce((total, it) => total + Number(it.line_value || 0), 0);
-    const containers = Math.max(1, Math.ceil(totalQty / 400));
-    const grossWeight = totalWeight + (containers * 900);
-    const currencySymbol = currency === "USD" ? "$" : (currency === "EUR" ? "€" : (currency === "GBP" ? "£" : "₹"));
+    const currency = pi.currency || 'INR'
+    const totalQty = items.reduce((total, it) => total + Number(it.qty || 0), 0)
+    const totalWeight = items.reduce(
+      (total, it) =>
+        total +
+        Number(it.qty || 0) * Number(it.weight || it.product_weight || 0),
+      0
+    )
+    const invoiceTotal = items.reduce(
+      (total, it) => total + Number(it.line_value || 0),
+      0
+    )
+    const containers = Math.max(1, Math.ceil(totalQty / 400))
+    const grossWeight = totalWeight + containers * 900
+    const currencySymbol =
+      currency === 'USD'
+        ? '$'
+        : currency === 'EUR'
+        ? '€'
+        : currency === 'GBP'
+        ? '£'
+        : '₹'
 
     const previewData = {
       exporter: {
-        logo_url: `${env.appUrl.replace(/\/$/, "")}/images/sai-samrat-logo.png`,
-        name: "SAI ACCUMULATOR INDUSTRIES PRIVATE LIMITED",
-        tagline: "Manufacturer & Exporter of Batteries",
-        address_line1: "Plot No. 52,53,76, Sangamner Co-Op. Ind. Estate Ltd.",
-        address_line2: "City: SANGAMNER-422608, Dist. Ahmednagar, State: MAHARASHTRA, Country: INDIA",
-        email: "admin@saisamrat.com",
-        export_email: "exports@saisamrat.com",
-        phone: "0091-2425-259068",
-        mobile: "0091 9958309603",
-        iec_code: "3106016043",
-        pan: "ABHCS1151K",
-        gst: "27ABHCS1151K1Z8",
+        logo_url: `${env.appUrl.replace(/\/$/, '')}/images/sai-samrat-logo.png`,
+        name: 'SAI ACCUMULATOR INDUSTRIES PRIVATE LIMITED',
+        tagline: 'Manufacturer & Exporter of Batteries',
+        address_line1: 'Plot No. 52,53,76, Sangamner Co-Op. Ind. Estate Ltd.',
+        address_line2:
+          'City: SANGAMNER-422608, Dist. Ahmednagar, State: MAHARASHTRA, Country: INDIA',
+        email: 'admin@saisamrat.com',
+        export_email: 'exports@saisamrat.com',
+        phone: '0091-2425-259068',
+        mobile: '0091 9958309603',
+        iec_code: '3106016043',
+        pan: 'ABHCS1151K',
+        gst: '27ABHCS1151K1Z8'
       },
       invoice: {
         pi_no: pi.pi_no,
         pi_date: formatDate(pi.pi_date),
         currency,
         currency_symbol: currencySymbol,
-        remarks: pi.remarks || "-",
-        approved_by: pi.approved_by_name || "-",
-        created_by: pi.created_by_name || "-",
+        remarks: pi.remarks || '-',
+        approved_by: pi.approved_by_name || '-',
+        created_by: pi.created_by_name || '-'
       },
       customer: {
-        name: pi.customer_company_name || pi.customer_name || "-",
-        address: pi.customer_address || "-",
+        name: pi.customer_company_name || pi.customer_name || '-',
+        address: pi.customer_address || '-',
         country: pickText(pi.customer_country, pi.country),
         postal_code: pickText(pi.customer_postal_code),
         email: pickText(pi.customer_email),
         mobile: pickText(pi.customer_mobile),
-        vat_no: pickText(pi.customer_vat_no, pi.customer_gst_number),
+        vat_no: pickText(pi.customer_vat_no, pi.customer_gst_number)
       },
       consignee: {
-        name: pi.customer_company_name || pi.customer_name || "-",
-        address: pi.customer_address || "-",
+        name: pi.customer_company_name || pi.customer_name || '-',
+        address: pi.customer_address || '-',
         country: pickText(pi.customer_country, pi.country),
         postal_code: pickText(pi.customer_postal_code),
         email: pickText(pi.customer_email),
         mobile: pickText(pi.customer_mobile),
-        vat_no: pickText(pi.customer_vat_no, pi.customer_gst_number),
+        vat_no: pickText(pi.customer_vat_no, pi.customer_gst_number)
       },
       terms: {
-        payment: pi.payment_terms || "50 % Advance along with PI & Balance against proof of BL",
-        delivery: "Within 30 Days from the date of Advance along with PO",
-        delivery_terms: pi.delivery_terms || "CIF SHARJAH",
-        packing: pickText(pi.packing, "20' Container, 20 Pallets, 20 Batteries in Each Pallet"),
-        validity: pickText(pi.validity_of_offer, "7 Days from the date of generation of this PI"),
-        other_term: pickText(pi.other_term),
+        payment:
+          pi.payment_terms ||
+          '50 % Advance along with PI & Balance against proof of BL',
+        delivery: 'Within 30 Days from the date of Advance along with PO',
+        delivery_terms: pi.delivery_terms || 'CIF SHARJAH',
+        packing: pickText(
+          pi.packing,
+          "20' Container, 20 Pallets, 20 Batteries in Each Pallet"
+        ),
+        validity: pickText(
+          pi.validity_of_offer,
+          '7 Days from the date of generation of this PI'
+        ),
+        other_term: pickText(pi.other_term)
       },
       shipment: {
-        country_of_origin: pickText(pi.country_of_origin, "INDIA"),
-        port_of_loading: pickText(pi.port_of_loading, "NHAVA SHEVA"),
+        country_of_origin: pickText(pi.country_of_origin, 'INDIA'),
+        port_of_loading: pickText(pi.port_of_loading, 'NHAVA SHEVA'),
         country_of_export: pickText(pi.country_of_export, pi.customer_country),
         port_of_discharge: pickText(pi.port_of_discharge),
-        final_destination: pickText(pi.final_destination, pi.customer_country),
+        final_destination: pickText(pi.final_destination, pi.customer_country)
       },
       items: items.map((it, idx) => ({
         sr_no: idx + 1,
@@ -679,13 +891,19 @@ export const preview = async (req, res) => {
         model_code: pickText(it.product_code_snapshot, it.product_code),
         fg_code: pickText(it.fg_code),
         description: pickText(it.product_description),
-        marking: pickText(it.product_marking, it.product_name_snapshot, it.product_name),
-        hsn_code: "85072000",
+        marking: pickText(
+          it.product_marking,
+          it.product_name_snapshot,
+          it.product_name
+        ),
+        hsn_code: '85072000',
         weight: formatQty(it.weight || it.product_weight, 2),
         qty: formatQty(it.qty),
-        unit: pickText(it.unit, "Nos"),
+        unit: pickText(it.unit, 'Nos'),
         rate: formatMoney(it.unit_rate),
-        line_value: formatMoney(it.line_value || (Number(it.qty || 0) * Number(it.unit_rate || 0))),
+        line_value: formatMoney(
+          it.line_value || Number(it.qty || 0) * Number(it.unit_rate || 0)
+        )
       })),
       blankRows: Array.from({ length: Math.max(0, 9 - items.length) }),
       summary: {
@@ -694,38 +912,48 @@ export const preview = async (req, res) => {
         net_weight: formatQty(totalWeight, 2),
         gross_weight: formatQty(grossWeight, 2),
         invoice_total: formatMoney(invoiceTotal),
-        insurance: "-",
-        freight: "at Actual",
-        advance_received: "-",
+        insurance: '-',
+        freight: 'at Actual',
+        advance_received: '-',
         pi_total: formatMoney(invoiceTotal),
-        amount_in_words: amountToWords(invoiceTotal, currency),
+        amount_in_words: amountToWords(invoiceTotal, currency)
       },
       bank: {
-        transfer_to: "-",
-        account_no: "091680600000030",
-        name: "SAI ACCUMULATOR INDUSTRIES PRIVATE LIMITED",
-        bank_name: "YES BANK, BRANCH SANGAMNER",
-        swift_code: "YESBINBB",
-        correspondent_bank: "JP Morgan Chase Bank",
-        correspondent_account: "765902317 (ABA Routing No.: 021000021)",
-        correspondent_swift: "CHASUS33",
-      },
-    };
+        transfer_to: '-',
+        account_no: '091680600000030',
+        name: 'SAI ACCUMULATOR INDUSTRIES PRIVATE LIMITED',
+        bank_name: 'YES BANK, BRANCH SANGAMNER',
+        swift_code: 'YESBINBB',
+        correspondent_bank: 'JP Morgan Chase Bank',
+        correspondent_account: '765902317 (ABA Routing No.: 021000021)',
+        correspondent_swift: 'CHASUS33'
+      }
+    }
 
-    const html = await renderTemplate("proformaInvoiceCompact", "preview", previewData);
-    if (req.path.endsWith("/pdf")) {
-      const pdf = await renderProformaPdf(html);
-      const filename = `${String(previewData.invoice.pi_no || "Proforma Invoice").replace(/[^a-zA-Z0-9_-]/g, "_")} - Proforma Invoice.pdf`;
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-      return res.send(pdf);
+    const html = await renderTemplate(
+      'proformaInvoiceCompact',
+      'preview',
+      previewData
+    )
+    if (req.path.endsWith('/pdf')) {
+      const pdf = await renderProformaPdf(html)
+      const filename = `${String(
+        previewData.invoice.pi_no || 'Proforma Invoice'
+      ).replace(/[^a-zA-Z0-9_-]/g, '_')} - Proforma Invoice.pdf`
+      res.setHeader('Content-Type', 'application/pdf')
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`)
+      return res.send(pdf)
     }
     return successResponse(res, {
       code: 1004,
       httpStatus: 200,
-      data: { html, invoice: previewData.invoice },
-    });
+      data: { html, invoice: previewData.invoice }
+    })
   } catch (error) {
-    return failureResponse(res, { code: 2008, httpStatus: 500, message: error.message });
+    return failureResponse(res, {
+      code: 2008,
+      httpStatus: 500,
+      message: error.message
+    })
   }
-};
+}
