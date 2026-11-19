@@ -6,11 +6,11 @@
 // // import { isSuperAdminRole as isSuperAdmin } from "#shared/utils/role.utils.js";
 // import { env } from "#config/env.js";
 
-// const MODULE_TABLE = "orders";
-// const ORDERS_LINE_TABLE = "order_items";
-// const PLANNING_TABLE = "order_item_planning";
-// const PRODUCTION_TABLE = "order_item_production";
-// const PRODUCTION_HISTORY_TABLE = "order_item_production_history";
+// const MODULE_TABLE = "production_notes";
+// const ORDERS_LINE_TABLE = "production_note_items";
+// const PLANNING_TABLE = "production_note_item_planning";
+// const PRODUCTION_TABLE = "production_note_item_production";
+// const PRODUCTION_HISTORY_TABLE = "production_note_item_production_history";
 
 // const default_columns = {};
 // const custom_columns = {
@@ -21,12 +21,12 @@
 //     key2: "customer_id",
 //     select: "cu.mobile_no AS customer_mobile, cu.email AS customer_email",
 //   },
-//   order_status: {
+//   production_note_status: {
 //     table: "categories",
 //     alias: "ct",
 //     column: "categoryName",
 //     key2: "slug",
-//     select: "ct.cat_color as order_status_color",
+//     select: "ct.cat_color as production_note_status_color",
 //   },
 //   priority: {
 //     table: "categories",
@@ -88,7 +88,7 @@
 // const calculatePendingQty = ({ orderQty, readyQty }) => Math.max(toNumber(orderQty) - toNumber(readyQty), 0);
 
 // const fetchProductionTargetItem = async ({ orderItemId, user }) => {
-//   const where = ["oi.order_item_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.order_status IN ('planned','production')"];
+//   const where = ["oi.production_note_item_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.production_note_status IN ('planned','production')"];
 //   const values = [orderItemId];
 
 //   // if (!isSuperAdmin(user) && user?.company_id) {
@@ -97,14 +97,14 @@
 //   // }
 
 //   const rows = await query(
-//     `SELECT oi.order_item_id, oi.order_id, oi.company_id, oi.order_qty, o.priority AS order_priority,
+//     `SELECT oi.production_note_item_id, oi.production_note_id, oi.company_id, oi.production_note_qty, o.priority AS order_priority,
 //             COALESCE(pl.ready_qty, 0) AS available_stock_qty,
 //             COALESCE(pl.saipl_qty, 0) AS saipl_mfg_qty,
 //             COALESCE(pl.pmk_qty, 0) AS pmk_procure_qty,
 //             pl.expected_ready_date
 //      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-//      INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.order_id = o.order_id
-//      LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
+//      INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.production_note_id = o.production_note_id
+//      LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
 //      WHERE ${where.join(" AND ")}`,
 //     values
 //   );
@@ -116,9 +116,9 @@
 //   if (!orderIds.length) return {};
 //   const placeholders = orderIds.map(() => "?").join(",");
 //   const rows = await query(
-//     `SELECT oi.order_id,
-//             COALESCE(COUNT(oi.order_item_id), 0) AS total_items,
-//             COALESCE(SUM(oi.order_qty), 0) AS item_total_qty,
+//     `SELECT oi.production_note_id,
+//             COALESCE(COUNT(oi.production_note_item_id), 0) AS total_items,
+//             COALESCE(SUM(oi.production_note_qty), 0) AS item_total_qty,
 //             COALESCE(SUM(pl.ready_qty), 0) AS available_stock_qty,
 //             COALESCE(SUM(pl.saipl_qty), 0) AS saipl_mfg_qty,
 //             COALESCE(SUM(pl.pmk_qty), 0) AS pmk_procure_qty,
@@ -127,29 +127,29 @@
 //             COALESCE(SUM(pr.qc_passed_qty), 0) AS qc_passed_qty,
 //             COALESCE(SUM(pr.rework_qty), 0) AS rework_qty,
 //             COALESCE(SUM(COALESCE(pr.ready_qty, pl.ready_qty, 0)), 0) AS production_ready_qty,
-//             COALESCE(SUM(COALESCE(pr.pending_qty, oi.order_qty)), 0) AS production_pending_qty,
+//             COALESCE(SUM(COALESCE(pr.pending_qty, oi.production_note_qty)), 0) AS production_pending_qty,
 //             CASE
-//               WHEN COALESCE(SUM(COALESCE(pr.ready_qty, pl.ready_qty, 0)), 0) >= COALESCE(SUM(oi.order_qty), 0) AND COALESCE(SUM(oi.order_qty), 0) > 0 THEN 'ready'
+//               WHEN COALESCE(SUM(COALESCE(pr.ready_qty, pl.ready_qty, 0)), 0) >= COALESCE(SUM(oi.production_note_qty), 0) AND COALESCE(SUM(oi.production_note_qty), 0) > 0 THEN 'ready'
 //               WHEN COALESCE(SUM(COALESCE(pr.ready_qty, pl.ready_qty, 0)), 0) > 0 THEN 'partially_ready'
 //               WHEN COUNT(pr.production_id) > 0 THEN 'in_progress'
 //               ELSE 'not_started'
 //             END AS production_status
 //      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-//      LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-//      LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.order_item_id = pr.order_item_id AND pr.status <> 'delete'
-//      WHERE oi.status <> 'delete' AND oi.order_id IN (${placeholders})
-//      GROUP BY oi.order_id`,
+//      LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+//      LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.production_note_item_id = pr.production_note_item_id AND pr.status <> 'delete'
+//      WHERE oi.status <> 'delete' AND oi.production_note_id IN (${placeholders})
+//      GROUP BY oi.production_note_id`,
 //     orderIds
 //   );
 
 //   return rows.reduce((acc, row) => {
-//     acc[row.order_id] = row;
+//     acc[row.production_note_id] = row;
 //     return acc;
 //   }, {});
 // };
 
 // const updateOrderProductionStatus = async ({ orderId, user }) => {
-//   const where = ["oi.order_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.order_status IN ('planned','production')"];
+//   const where = ["oi.production_note_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.production_note_status IN ('planned','production')"];
 //   const values = [orderId];
 //   // if (!isSuperAdmin(user) && user?.company_id) {
 //   //   where.push("o.company_id = ?");
@@ -157,15 +157,15 @@
 //   // }
 
 //   const rows = await query(
-//     `SELECT oi.order_item_id, oi.order_qty,
+//     `SELECT oi.production_note_item_id, oi.production_note_qty,
 //             COALESCE(pl.ready_qty, 0) AS available_stock_qty,
 //             COALESCE(pr.qc_passed_qty, 0) AS qc_passed_qty,
 //             COALESCE(pr.procured_qty, 0) AS procured_qty,
 //             pr.production_id
 //      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-//      INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.order_id = o.order_id
-//      LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-//      LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.order_item_id = pr.order_item_id AND pr.status <> 'delete'
+//      INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.production_note_id = o.production_note_id
+//      LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+//      LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.production_note_item_id = pr.production_note_item_id AND pr.status <> 'delete'
 //      WHERE ${where.join(" AND ")}`,
 //     values
 //   );
@@ -178,17 +178,17 @@
 //       qcPassedQty: row.qc_passed_qty,
 //       procuredQty: row.procured_qty,
 //     });
-//     return toNumber(row.order_qty) > 0 && readyQty >= toNumber(row.order_qty);
+//     return toNumber(row.production_note_qty) > 0 && readyQty >= toNumber(row.production_note_qty);
 //   });
 
 //   const hasProduction = rows.some((row) => row.production_id);
 //   const nextOrderStatus = isFullyReady ? "ready" : hasProduction ? "production" : "planned";
-//   const orderWhere = { order_id: orderId };
+//   const orderWhere = { production_note_id: orderId };
 //   // if (!isSuperAdmin(user) && user?.company_id) orderWhere.company_id = user.company_id;
 
 //   await CommonModel.updateMasterDetails({
 //     table: MODULE_TABLE,
-//     data: { order_status: nextOrderStatus, modified_by: user.adminID, modified_date: toMysqlDateTime() },
+//     data: { production_note_status: nextOrderStatus, modified_by: user.adminID, modified_date: toMysqlDateTime() },
 //     where: orderWhere,
 //   });
 
@@ -196,7 +196,7 @@
 // };
 
 // const saveProductionForItem = async ({ item, body, user }) => {
-//   const orderQty = toNumber(item.order_qty);
+//   const orderQty = toNumber(item.production_note_qty);
 //   const availableStockQty = toNumber(item.available_stock_qty);
 //   const saiplMfgQty = toNumber(item.saipl_mfg_qty);
 //   const pmkProcureQty = toNumber(item.pmk_procure_qty);
@@ -207,16 +207,16 @@
 //   const readyQty = calculateReadyQty({ availableStockQty, qcPassedQty, procuredQty });
 //   const pendingQty = calculatePendingQty({ orderQty, readyQty });
 
-//   if (producedQty > saiplMfgQty) throw new Error(`Produced qty cannot be greater than SAIPL MFG qty for item ${item.order_item_id}`);
-//   if (qcPassedQty + reworkQty > producedQty) throw new Error(`QC Passed + Rework qty cannot be greater than Produced qty for item ${item.order_item_id}`);
-//   if (procuredQty > pmkProcureQty) throw new Error(`Procured qty cannot be greater than PMK Procure qty for item ${item.order_item_id}`);
-//   if (readyQty > orderQty) throw new Error(`Ready qty cannot be greater than Order qty for item ${item.order_item_id}`);
+//   if (producedQty > saiplMfgQty) throw new Error(`Produced qty cannot be greater than SAIPL MFG qty for item ${item.production_note_item_id}`);
+//   if (qcPassedQty + reworkQty > producedQty) throw new Error(`QC Passed + Rework qty cannot be greater than Produced qty for item ${item.production_note_item_id}`);
+//   if (procuredQty > pmkProcureQty) throw new Error(`Procured qty cannot be greater than PMK Procure qty for item ${item.production_note_item_id}`);
+//   if (readyQty > orderQty) throw new Error(`Ready qty cannot be greater than Order qty for item ${item.production_note_item_id}`);
 
 //   const productionStatus = buildProductionStatus({ orderQty, availableStockQty, producedQty, qcPassedQty, procuredQty, explicitStatus: body.production_status });
 //   const priority = normalizeEnum(body.priority || item.order_priority, allowedPriorities, "normal");
 //   const remarks = body.remarks || null;
 
-//   const existingRows = await CommonModel.getMasterDetails(PRODUCTION_TABLE, "*", { order_item_id: item.order_item_id });
+//   const existingRows = await CommonModel.getMasterDetails(PRODUCTION_TABLE, "*", { production_note_item_id: item.production_note_item_id });
 //   const existing = existingRows.find((row) => row.status !== "delete");
 //   let productionId = existing?.production_id || null;
 
@@ -247,8 +247,8 @@
 //       table: PRODUCTION_TABLE,
 //       data: {
 //         company_id: item.company_id,
-//         order_id: item.order_id,
-//         order_item_id: item.order_item_id,
+//         production_note_id: item.production_note_id,
+//         production_note_item_id: item.production_note_item_id,
 //         ...data,
 //         start_date: toMysqlDateTime().slice(0, 10),
 //         created_by: user.adminID,
@@ -265,7 +265,7 @@
 //       data: {
 //         company_id: item.company_id,
 //         production_id: productionId,
-//         order_item_id: item.order_item_id,
+//         production_note_item_id: item.production_note_item_id,
 //         old_ready_qty: existing.ready_qty,
 //         new_ready_qty: readyQty,
 //         old_production_status: existing.production_status,
@@ -277,7 +277,7 @@
 //     });
 //   }
 
-//   return { production_id: productionId, order_item_id: item.order_item_id, production_status: productionStatus, ready_qty: readyQty, pending_qty: pendingQty };
+//   return { production_id: productionId, production_note_item_id: item.production_note_item_id, production_status: productionStatus, ready_qty: readyQty, pending_qty: pendingQty };
 // };
 
 // export const list = async (req, res) => {
@@ -290,16 +290,16 @@
 //     const filterData = prepareFilterData({
 //       filters,
 //       searchText,
-//       other: { orderBy, order, searchColumns: ["order_no"] },
+//       other: { orderBy, order, searchColumns: ["production_note_no"] },
 //       default_columns,
 //       custom_columns,
 //     });
 
 //     const { select, where, values, join, other } = filterData;
 //     where.push("t.status <> 'delete'");
-//     where.push("t.order_status IN ('planned','production')");
+//     where.push("t.production_note_status IN ('planned','production')");
 //     other.freeTextSearch = searchText;
-//     other.searchColumns = ["t.order_no", "t.brand", "cu.name", "sp.name"];
+//     other.searchColumns = ["t.production_note_no", "t.brand", "cu.name", "sp.name"];
 
 //     // if (!isSuperAdmin(req.user) && req.user.company_id) {
 //     //   where.push("t.company_id = ?");
@@ -308,22 +308,22 @@
 
 //     const total = await CommonModel.getCountsByParameter({ table: MODULE_TABLE, where, values, join, other });
 //     const orderList = await CommonModel.GetMasterListDetails({ select, table: MODULE_TABLE, where, values, limit: getAll === "Y" ? "" : limit, start, join, other });
-//     const aggregateMap = await getProductionAggregateByOrderIds(orderList.map((row) => row.order_id).filter(Boolean));
+//     const aggregateMap = await getProductionAggregateByOrderIds(orderList.map((row) => row.production_note_id).filter(Boolean));
 
 //     const rows = orderList.map((row) => ({
 //       ...row,
-//       total_items: aggregateMap[row.order_id]?.total_items || 0,
-//       item_total_qty: aggregateMap[row.order_id]?.item_total_qty || 0,
-//       available_stock_qty: aggregateMap[row.order_id]?.available_stock_qty || 0,
-//       saipl_mfg_qty: aggregateMap[row.order_id]?.saipl_mfg_qty || 0,
-//       pmk_procure_qty: aggregateMap[row.order_id]?.pmk_procure_qty || 0,
-//       produced_qty: aggregateMap[row.order_id]?.produced_qty || 0,
-//       procured_qty: aggregateMap[row.order_id]?.procured_qty || 0,
-//       qc_passed_qty: aggregateMap[row.order_id]?.qc_passed_qty || 0,
-//       rework_qty: aggregateMap[row.order_id]?.rework_qty || 0,
-//       production_ready_qty: aggregateMap[row.order_id]?.production_ready_qty || 0,
-//       production_pending_qty: aggregateMap[row.order_id]?.production_pending_qty || row.total_order_qty || 0,
-//       production_status: aggregateMap[row.order_id]?.production_status || "not_started",
+//       total_items: aggregateMap[row.production_note_id]?.total_items || 0,
+//       item_total_qty: aggregateMap[row.production_note_id]?.item_total_qty || 0,
+//       available_stock_qty: aggregateMap[row.production_note_id]?.available_stock_qty || 0,
+//       saipl_mfg_qty: aggregateMap[row.production_note_id]?.saipl_mfg_qty || 0,
+//       pmk_procure_qty: aggregateMap[row.production_note_id]?.pmk_procure_qty || 0,
+//       produced_qty: aggregateMap[row.production_note_id]?.produced_qty || 0,
+//       procured_qty: aggregateMap[row.production_note_id]?.procured_qty || 0,
+//       qc_passed_qty: aggregateMap[row.production_note_id]?.qc_passed_qty || 0,
+//       rework_qty: aggregateMap[row.production_note_id]?.rework_qty || 0,
+//       production_ready_qty: aggregateMap[row.production_note_id]?.production_ready_qty || 0,
+//       production_pending_qty: aggregateMap[row.production_note_id]?.production_pending_qty || row.total_production_note_qty || 0,
+//       production_status: aggregateMap[row.production_note_id]?.production_status || "not_started",
 //     }));
 
 //     return successResponse(res, {
@@ -341,20 +341,20 @@
 //     const { orderId } = req.params;
 //     if (!orderId) return failureResponse(res, { code: 2004, httpStatus: 404 });
 
-//     const where = { order_id: orderId };
+//     const where = { production_note_id: orderId };
 //     // if (!isSuperAdmin(req.user) && req.user.company_id) where.company_id = req.user.company_id;
 //     const orderRows = await CommonModel.getMasterDetails(MODULE_TABLE, "*", where);
-//     const orderDetails = orderRows.find((row) => row.status !== "delete" && ["planned", "production"].includes(row.order_status));
+//     const orderDetails = orderRows.find((row) => row.status !== "delete" && ["planned", "production"].includes(row.production_note_status));
 //     if (!orderDetails) return failureResponse(res, { code: 2004, httpStatus: 404 });
 
 //     const customerRows = orderDetails.customer_id ? await CommonModel.getMasterDetails("customer", "name AS customer_name, mobile_no AS customer_mobile, email AS customer_email", { customer_id: orderDetails.customer_id }) : [];
 
 //     const items = await query(
-//       `SELECT oi.order_item_id, oi.order_id, oi.company_id, oi.product_id,
+//       `SELECT oi.production_note_item_id, oi.production_note_id, oi.company_id, oi.product_id,
 //               COALESCE(oi.product_code_snapshot, p.product_code) AS product_code,
 //               COALESCE(oi.product_name_snapshot, p.product_name) AS product_name,
 //               COALESCE(oi.brand_snapshot, p.brand) AS series,
-//               p.weight, oi.order_qty, oi.unit_rate, oi.line_value,
+//               p.weight, oi.production_note_qty, oi.unit_rate, oi.line_value,
 //               p.fg_code,
 //               COALESCE(pl.ready_qty, 0) AS available_stock_qty,
 //               COALESCE(pl.saipl_qty, 0) AS saipl_mfg_qty,
@@ -364,18 +364,18 @@
 //               COALESCE(pr.qc_passed_qty, 0) AS qc_passed_qty,
 //               COALESCE(pr.rework_qty, 0) AS rework_qty,
 //               COALESCE(pr.ready_qty, pl.ready_qty, 0) AS ready_qty,
-//               COALESCE(pr.pending_qty, oi.order_qty) AS pending_qty,
+//               COALESCE(pr.pending_qty, oi.production_note_qty) AS pending_qty,
 //               COALESCE(pr.production_status, 'not_started') AS production_status,
 //               COALESCE(pr.priority, pl.priority, o.priority, 'normal') AS priority,
 //               COALESCE(pr.expected_ready_date, pl.expected_ready_date) AS expected_ready_date,
 //               pr.remarks
 //        FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-//        INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.order_id = o.order_id
+//        INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.production_note_id = o.production_note_id
 //        LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
-//        LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-//        LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.order_item_id = pr.order_item_id AND pr.status <> 'delete'
-//        WHERE oi.order_id = ? AND oi.status <> 'delete'
-//        ORDER BY oi.order_item_id ASC`,
+//        LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+//        LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.production_note_item_id = pr.production_note_item_id AND pr.status <> 'delete'
+//        WHERE oi.production_note_id = ? AND oi.status <> 'delete'
+//        ORDER BY oi.production_note_item_id ASC`,
 //       [orderId]
 //     );
 
@@ -388,15 +388,15 @@
 // export const startProduction = async (req, res) => {
 //   try {
 //     const { orderId } = req.params;
-//     const where = { order_id: orderId };
+//     const where = { production_note_id: orderId };
 //     // if (!isSuperAdmin(req.user) && req.user.company_id) where.company_id = req.user.company_id;
 //     const result = await CommonModel.updateMasterDetails({
 //       table: MODULE_TABLE,
-//       data: { order_status: "production", modified_by: req.user.adminID, modified_date: toMysqlDateTime() },
+//       data: { production_note_status: "production", modified_by: req.user.adminID, modified_date: toMysqlDateTime() },
 //       where,
 //     });
 //     if (!result.affectedRows) return failureResponse(res, { code: 2004, httpStatus: 404 });
-//     return successResponse(res, { code: 1002, httpStatus: 200, data: { order_id: orderId, order_status: "production" }, message: "Production started successfully" });
+//     return successResponse(res, { code: 1002, httpStatus: 200, data: { production_note_id: orderId, production_note_status: "production" }, message: "Production started successfully" });
 //   } catch (error) {
 //     console.log(error);
 
@@ -415,15 +415,15 @@
 //     let rowIndex = 0;
 //     for (const row of items) {
 //       rowIndex++;
-//       const item = await fetchProductionTargetItem({ orderItemId: row.order_item_id, user: req.user });
-//       if (!item || Number(item.order_id) !== Number(orderId)) {
-//         return failureResponse(res, { code: 2004, httpStatus: 404, message: `Order item ${row.order_item_id} not found for this order at row ${rowIndex}` });
+//       const item = await fetchProductionTargetItem({ orderItemId: row.production_note_item_id, user: req.user });
+//       if (!item || Number(item.production_note_id) !== Number(orderId)) {
+//         return failureResponse(res, { code: 2004, httpStatus: 404, message: `Order item ${row.production_note_item_id} not found for this order at row ${rowIndex}` });
 //       }
 //       savedItems.push(await saveProductionForItem({ item, body: row, user: req.user }));
 //     }
 
 //     const orderStatus = await updateOrderProductionStatus({ orderId, user: req.user });
-//     return successResponse(res, { code: 1002, httpStatus: 200, data: { order_id: orderId, order_status: orderStatus, items: savedItems }, message: "Production updated successfully" });
+//     return successResponse(res, { code: 1002, httpStatus: 200, data: { production_note_id: orderId, production_note_status: orderStatus, items: savedItems }, message: "Production updated successfully" });
 //   } catch (error) {
 //     const isValidation = /cannot be greater/i.test(error.message);
 //     return failureResponse(res, { code: 2008, httpStatus: isValidation ? 400 : 500, message: error.message });
@@ -440,11 +440,11 @@ import { toMysqlDateTime } from "#shared/utils/dateTime.js";
 // import { isSuperAdminRole as isSuperAdmin } from "#shared/utils/role.utils.js";
 import { env } from "#config/env.js";
 
-const MODULE_TABLE = "orders";
-const ORDERS_LINE_TABLE = "order_items";
-const PLANNING_TABLE = "order_item_planning";
-const PRODUCTION_TABLE = "order_item_production";
-const PRODUCTION_HISTORY_TABLE = "order_item_production_history";
+const MODULE_TABLE = "production_notes";
+const ORDERS_LINE_TABLE = "production_note_items";
+const PLANNING_TABLE = "production_note_item_planning";
+const PRODUCTION_TABLE = "production_note_item_production";
+const PRODUCTION_HISTORY_TABLE = "production_note_item_production_history";
 
 const default_columns = {};
 const custom_columns = {
@@ -455,12 +455,12 @@ const custom_columns = {
     key2: "customer_id",
     select: "cu.mobile_no AS customer_mobile, cu.email AS customer_email",
   },
-  order_status: {
+  production_note_status: {
     table: "categories",
     alias: "ct",
     column: "categoryName",
     key2: "slug",
-    select: "ct.cat_color as order_status_color",
+    select: "ct.cat_color as production_note_status_color",
   },
   priority: {
     table: "categories",
@@ -523,7 +523,7 @@ const buildProductionStatus = ({ orderQty, availableStockQty, producedQty, procu
 };
 
 const fetchProductionTargetItem = async ({ orderItemId, user }) => {
-  const where = ["oi.order_item_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.order_status IN ('planned','production')"];
+  const where = ["oi.production_note_item_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.production_note_status IN ('planned','production')"];
   const values = [orderItemId];
 
   // if (!isSuperAdmin(user) && user?.company_id) {
@@ -532,14 +532,14 @@ const fetchProductionTargetItem = async ({ orderItemId, user }) => {
   // }
 
   const rows = await query(
-    `SELECT oi.order_item_id, oi.order_id, oi.company_id, oi.order_qty, o.priority AS order_priority,
+    `SELECT oi.production_note_item_id, oi.production_note_id, oi.company_id, oi.production_note_qty, o.priority AS order_priority,
             COALESCE(pl.ready_qty, 0) AS available_stock_qty,
             COALESCE(pl.saipl_qty, 0) AS saipl_mfg_qty,
             COALESCE(pl.pmk_qty, 0) AS pmk_procure_qty,
             pl.expected_ready_date
      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-     INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.order_id = o.order_id
-     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.production_note_id = o.production_note_id
+     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
      WHERE ${where.join(" AND ")}`,
     values
   );
@@ -551,38 +551,38 @@ const getProductionAggregateByOrderIds = async (orderIds = []) => {
   if (!orderIds.length) return {};
   const placeholders = orderIds.map(() => "?").join(",");
   const rows = await query(
-    `SELECT oi.order_id,
-            COALESCE(COUNT(oi.order_item_id), 0) AS total_items,
-            COALESCE(SUM(oi.order_qty), 0) AS item_total_qty,
+    `SELECT oi.production_note_id,
+            COALESCE(COUNT(oi.production_note_item_id), 0) AS total_items,
+            COALESCE(SUM(oi.production_note_qty), 0) AS item_total_qty,
             COALESCE(SUM(pl.ready_qty), 0) AS available_stock_qty,
             COALESCE(SUM(pl.saipl_qty), 0) AS saipl_mfg_qty,
             COALESCE(SUM(pl.pmk_qty), 0) AS pmk_procure_qty,
             COALESCE(SUM(pr.produced_qty), 0) AS produced_qty,
             COALESCE(SUM(pr.procured_qty), 0) AS procured_qty,
             COALESCE(SUM(COALESCE(pr.ready_qty, pl.ready_qty, 0)), 0) AS production_ready_qty,
-            COALESCE(SUM(COALESCE(pr.pending_qty, oi.order_qty)), 0) AS production_pending_qty,
+            COALESCE(SUM(COALESCE(pr.pending_qty, oi.production_note_qty)), 0) AS production_pending_qty,
             CASE
-              WHEN COALESCE(SUM(COALESCE(pr.ready_qty, pl.ready_qty, 0)), 0) >= COALESCE(SUM(oi.order_qty), 0) AND COALESCE(SUM(oi.order_qty), 0) > 0 THEN 'ready'
+              WHEN COALESCE(SUM(COALESCE(pr.ready_qty, pl.ready_qty, 0)), 0) >= COALESCE(SUM(oi.production_note_qty), 0) AND COALESCE(SUM(oi.production_note_qty), 0) > 0 THEN 'ready'
               WHEN COALESCE(SUM(COALESCE(pr.ready_qty, pl.ready_qty, 0)), 0) > 0 THEN 'partially_ready'
               WHEN COUNT(pr.production_id) > 0 THEN 'in_progress'
               ELSE 'not_started'
             END AS production_status
      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-     LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.order_item_id = pr.order_item_id AND pr.status <> 'delete'
-     WHERE oi.status <> 'delete' AND oi.order_id IN (${placeholders})
-     GROUP BY oi.order_id`,
+     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.production_note_item_id = pr.production_note_item_id AND pr.status <> 'delete'
+     WHERE oi.status <> 'delete' AND oi.production_note_id IN (${placeholders})
+     GROUP BY oi.production_note_id`,
     orderIds
   );
 
   return rows.reduce((acc, row) => {
-    acc[row.order_id] = row;
+    acc[row.production_note_id] = row;
     return acc;
   }, {});
 };
 
 const updateOrderProductionStatus = async ({ orderId, user }) => {
-  const where = ["oi.order_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.order_status IN ('planned','production')"];
+  const where = ["oi.production_note_id = ?", "oi.status <> 'delete'", "o.status <> 'delete'", "o.production_note_status IN ('planned','production')"];
   const values = [orderId];
   // if (!isSuperAdmin(user) && user?.company_id) {
   //   where.push("o.company_id = ?");
@@ -590,15 +590,15 @@ const updateOrderProductionStatus = async ({ orderId, user }) => {
   // }
 
   const rows = await query(
-    `SELECT oi.order_item_id, oi.order_qty,
+    `SELECT oi.production_note_item_id, oi.production_note_qty,
             COALESCE(pl.ready_qty, 0) AS available_stock_qty,
             COALESCE(pr.produced_qty, 0) AS produced_qty,
             COALESCE(pr.procured_qty, 0) AS procured_qty,
             pr.production_id
      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-     INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.order_id = o.order_id
-     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-     LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.order_item_id = pr.order_item_id AND pr.status <> 'delete'
+     INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.production_note_id = o.production_note_id
+     LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+     LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.production_note_item_id = pr.production_note_item_id AND pr.status <> 'delete'
      WHERE ${where.join(" AND ")}`,
     values
   );
@@ -611,17 +611,17 @@ const updateOrderProductionStatus = async ({ orderId, user }) => {
       producedQty: row.produced_qty,
       procuredQty: row.procured_qty,
     });
-    return toNumber(row.order_qty) > 0 && readyQty >= toNumber(row.order_qty);
+    return toNumber(row.production_note_qty) > 0 && readyQty >= toNumber(row.production_note_qty);
   });
 
   const hasProduction = rows.some((row) => row.production_id);
   const nextOrderStatus = isFullyReady ? "ready" : hasProduction ? "production" : "planned";
-  const orderWhere = { order_id: orderId };
+  const orderWhere = { production_note_id: orderId };
   // if (!isSuperAdmin(user) && user?.company_id) orderWhere.company_id = user.company_id;
 
   await CommonModel.updateMasterDetails({
     table: MODULE_TABLE,
-    data: { order_status: nextOrderStatus, modified_by: user.adminID, modified_date: toMysqlDateTime() },
+    data: { production_note_status: nextOrderStatus, modified_by: user.adminID, modified_date: toMysqlDateTime() },
     where: orderWhere,
   });
 
@@ -629,7 +629,7 @@ const updateOrderProductionStatus = async ({ orderId, user }) => {
 };
 
 const saveProductionForItem = async ({ item, body, user }) => {
-  const orderQty = toNumber(item.order_qty);
+  const orderQty = toNumber(item.production_note_qty);
   const availableStockQty = toNumber(item.available_stock_qty);
   const saiplMfgQty = toNumber(item.saipl_mfg_qty);
   const pmkProcureQty = toNumber(item.pmk_procure_qty);
@@ -638,15 +638,15 @@ const saveProductionForItem = async ({ item, body, user }) => {
   const readyQty = calculateReadyQty({ availableStockQty, producedQty, procuredQty });
   const pendingQty = calculatePendingQty({ orderQty, readyQty });
 
-  if (producedQty > saiplMfgQty) throw new Error(`Produced qty cannot be greater than SAIPL MFG qty for item ${item.order_item_id}`);
-  if (procuredQty > pmkProcureQty) throw new Error(`Procured qty cannot be greater than PMK Procure qty for item ${item.order_item_id}`);
-  if (readyQty > orderQty) throw new Error(`Ready qty cannot be greater than Order qty for item ${item.order_item_id}`);
+  if (producedQty > saiplMfgQty) throw new Error(`Produced qty cannot be greater than SAIPL MFG qty for item ${item.production_note_item_id}`);
+  if (procuredQty > pmkProcureQty) throw new Error(`Procured qty cannot be greater than PMK Procure qty for item ${item.production_note_item_id}`);
+  if (readyQty > orderQty) throw new Error(`Ready qty cannot be greater than Order qty for item ${item.production_note_item_id}`);
 
   const productionStatus = buildProductionStatus({ orderQty, availableStockQty, producedQty, procuredQty, explicitStatus: body.production_status });
   const priority = normalizeEnum(body.priority || item.order_priority, allowedPriorities, "normal");
   const remarks = body.remarks || null;
 
-  const existingRows = await CommonModel.getMasterDetails(PRODUCTION_TABLE, "*", { order_item_id: item.order_item_id });
+  const existingRows = await CommonModel.getMasterDetails(PRODUCTION_TABLE, "*", { production_note_item_id: item.production_note_item_id });
   const existing = existingRows.find((row) => row.status !== "delete");
   let productionId = existing?.production_id || null;
 
@@ -675,8 +675,8 @@ const saveProductionForItem = async ({ item, body, user }) => {
       table: PRODUCTION_TABLE,
       data: {
         company_id: item.company_id,
-        order_id: item.order_id,
-        order_item_id: item.order_item_id,
+        production_note_id: item.production_note_id,
+        production_note_item_id: item.production_note_item_id,
         ...data,
         start_date: toMysqlDateTime().slice(0, 10),
         created_by: user.adminID,
@@ -693,7 +693,7 @@ const saveProductionForItem = async ({ item, body, user }) => {
       data: {
         company_id: item.company_id,
         production_id: productionId,
-        order_item_id: item.order_item_id,
+        production_note_item_id: item.production_note_item_id,
         old_ready_qty: existing.ready_qty,
         new_ready_qty: readyQty,
         old_production_status: existing.production_status,
@@ -705,7 +705,7 @@ const saveProductionForItem = async ({ item, body, user }) => {
     });
   }
 
-  return { production_id: productionId, order_item_id: item.order_item_id, production_status: productionStatus, ready_qty: readyQty, pending_qty: pendingQty };
+  return { production_id: productionId, production_note_item_id: item.production_note_item_id, production_status: productionStatus, ready_qty: readyQty, pending_qty: pendingQty };
 };
 
 export const list = async (req, res) => {
@@ -718,16 +718,16 @@ export const list = async (req, res) => {
     const filterData = prepareFilterData({
       filters,
       searchText,
-      other: { orderBy, order, searchColumns: ["order_no"] },
+      other: { orderBy, order, searchColumns: ["production_note_no"] },
       default_columns,
       custom_columns,
     });
 
     const { select, where, values, join, other } = filterData;
     where.push("t.status <> 'delete'");
-    where.push("t.order_status IN ('planned','production')");
+    where.push("t.production_note_status IN ('planned','production')");
     other.freeTextSearch = searchText;
-    other.searchColumns = ["t.order_no", "t.brand", "cu.name", "sp.name"];
+    other.searchColumns = ["t.production_note_no", "t.brand", "cu.name", "sp.name"];
 
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.push("t.company_id = ?");
@@ -736,20 +736,20 @@ export const list = async (req, res) => {
 
     const total = await CommonModel.getCountsByParameter({ table: MODULE_TABLE, where, values, join, other });
     const orderList = await CommonModel.GetMasterListDetails({ select, table: MODULE_TABLE, where, values, limit: getAll === "Y" ? "" : limit, start, join, other });
-    const aggregateMap = await getProductionAggregateByOrderIds(orderList.map((row) => row.order_id).filter(Boolean));
+    const aggregateMap = await getProductionAggregateByOrderIds(orderList.map((row) => row.production_note_id).filter(Boolean));
 
     const rows = orderList.map((row) => ({
       ...row,
-      total_items: aggregateMap[row.order_id]?.total_items || 0,
-      item_total_qty: aggregateMap[row.order_id]?.item_total_qty || 0,
-      available_stock_qty: aggregateMap[row.order_id]?.available_stock_qty || 0,
-      saipl_mfg_qty: aggregateMap[row.order_id]?.saipl_mfg_qty || 0,
-      pmk_procure_qty: aggregateMap[row.order_id]?.pmk_procure_qty || 0,
-      produced_qty: aggregateMap[row.order_id]?.produced_qty || 0,
-      procured_qty: aggregateMap[row.order_id]?.procured_qty || 0,
-      production_ready_qty: aggregateMap[row.order_id]?.production_ready_qty || 0,
-      production_pending_qty: aggregateMap[row.order_id]?.production_pending_qty || row.total_order_qty || 0,
-      production_status: aggregateMap[row.order_id]?.production_status || "not_started",
+      total_items: aggregateMap[row.production_note_id]?.total_items || 0,
+      item_total_qty: aggregateMap[row.production_note_id]?.item_total_qty || 0,
+      available_stock_qty: aggregateMap[row.production_note_id]?.available_stock_qty || 0,
+      saipl_mfg_qty: aggregateMap[row.production_note_id]?.saipl_mfg_qty || 0,
+      pmk_procure_qty: aggregateMap[row.production_note_id]?.pmk_procure_qty || 0,
+      produced_qty: aggregateMap[row.production_note_id]?.produced_qty || 0,
+      procured_qty: aggregateMap[row.production_note_id]?.procured_qty || 0,
+      production_ready_qty: aggregateMap[row.production_note_id]?.production_ready_qty || 0,
+      production_pending_qty: aggregateMap[row.production_note_id]?.production_pending_qty || row.total_production_note_qty || 0,
+      production_status: aggregateMap[row.production_note_id]?.production_status || "not_started",
     }));
 
     return successResponse(res, {
@@ -767,20 +767,21 @@ export const getDetails = async (req, res) => {
     const { orderId } = req.params;
     if (!orderId) return failureResponse(res, { code: 2004, httpStatus: 404 });
 
-    const where = { order_id: orderId };
+    const where = { production_note_id: orderId };
     // if (!isSuperAdmin(req.user) && req.user.company_id) where.company_id = req.user.company_id;
     const orderRows = await CommonModel.getMasterDetails(MODULE_TABLE, "*", where);
-    const orderDetails = orderRows.find((row) => row.status !== "delete" && ["planned", "production"].includes(row.order_status));
+    const orderDetails = orderRows.find((row) => row.status !== "delete" && ["planned", "production"].includes(row.production_note_status));
     if (!orderDetails) return failureResponse(res, { code: 2004, httpStatus: 404 });
+
 
     const customerRows = orderDetails.customer_id ? await CommonModel.getMasterDetails("customer", "name AS customer_name, mobile_no AS customer_mobile, email AS customer_email", { customer_id: orderDetails.customer_id }) : [];
 
     const items = await query(
-      `SELECT oi.order_item_id, oi.order_id, oi.company_id, oi.product_id,
+      `SELECT oi.production_note_item_id, oi.production_note_id, oi.company_id, oi.product_id,
               COALESCE(oi.product_code_snapshot, p.product_code) AS product_code,
               COALESCE(oi.product_name_snapshot, p.product_name) AS product_name,
               COALESCE(oi.brand_snapshot, p.brand) AS series,
-              p.weight, oi.order_qty, oi.unit_rate, oi.line_value,
+              p.weight, oi.production_note_qty, oi.unit_rate, oi.line_value,
               p.fg_code,
               COALESCE(pl.ready_qty, 0) AS available_stock_qty,
               COALESCE(pl.saipl_qty, 0) AS saipl_mfg_qty,
@@ -788,18 +789,18 @@ export const getDetails = async (req, res) => {
               COALESCE(pr.produced_qty, 0) AS produced_qty,
               COALESCE(pr.procured_qty, 0) AS procured_qty,
               COALESCE(pr.ready_qty, pl.ready_qty, 0) AS ready_qty,
-              COALESCE(pr.pending_qty, oi.order_qty) AS pending_qty,
+              COALESCE(pr.pending_qty, oi.production_note_qty) AS pending_qty,
               COALESCE(pr.production_status, 'not_started') AS production_status,
               COALESCE(pr.priority, pl.priority, o.priority, 'normal') AS priority,
               COALESCE(pr.expected_ready_date, pl.expected_ready_date) AS expected_ready_date,
               pr.remarks
        FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
-       INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.order_id = o.order_id
+       INNER JOIN ${DB_PREFIX}${MODULE_TABLE} o ON oi.production_note_id = o.production_note_id
        LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
-       LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.order_item_id = pl.order_item_id AND pl.status <> 'delete'
-       LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.order_item_id = pr.order_item_id AND pr.status <> 'delete'
-       WHERE oi.order_id = ? AND oi.status <> 'delete'
-       ORDER BY oi.order_item_id ASC`,
+       LEFT JOIN ${DB_PREFIX}${PLANNING_TABLE} pl ON oi.production_note_item_id = pl.production_note_item_id AND pl.status <> 'delete'
+       LEFT JOIN ${DB_PREFIX}${PRODUCTION_TABLE} pr ON oi.production_note_item_id = pr.production_note_item_id AND pr.status <> 'delete'
+       WHERE oi.production_note_id = ? AND oi.status <> 'delete'
+       ORDER BY oi.production_note_item_id ASC`,
       [orderId]
     );
 
@@ -812,15 +813,15 @@ export const getDetails = async (req, res) => {
 export const startProduction = async (req, res) => {
   try {
     const { orderId } = req.params;
-    const where = { order_id: orderId };
+    const where = { production_note_id: orderId };
     // if (!isSuperAdmin(req.user) && req.user.company_id) where.company_id = req.user.company_id;
     const result = await CommonModel.updateMasterDetails({
       table: MODULE_TABLE,
-      data: { order_status: "production", modified_by: req.user.adminID, modified_date: toMysqlDateTime() },
+      data: { production_note_status: "production", modified_by: req.user.adminID, modified_date: toMysqlDateTime() },
       where,
     });
     if (!result.affectedRows) return failureResponse(res, { code: 2004, httpStatus: 404 });
-    return successResponse(res, { code: 1002, httpStatus: 200, data: { order_id: orderId, order_status: "production" }, message: "Production started successfully" });
+    return successResponse(res, { code: 1002, httpStatus: 200, data: { production_note_id: orderId, production_note_status: "production" }, message: "Production started successfully" });
   } catch (error) {
     console.log(error);
 
@@ -839,15 +840,15 @@ export const saveOrderProduction = async (req, res) => {
     let rowIndex = 0;
     for (const row of items) {
       rowIndex++;
-      const item = await fetchProductionTargetItem({ orderItemId: row.order_item_id, user: req.user });
-      if (!item || Number(item.order_id) !== Number(orderId)) {
-        return failureResponse(res, { code: 2004, httpStatus: 404, message: `Order item ${row.order_item_id} not found for this order at row ${rowIndex}` });
+      const item = await fetchProductionTargetItem({ orderItemId: row.production_note_item_id, user: req.user });
+      if (!item || Number(item.production_note_id) !== Number(orderId)) {
+        return failureResponse(res, { code: 2004, httpStatus: 404, message: `Order item ${row.production_note_item_id} not found for this order at row ${rowIndex}` });
       }
       savedItems.push(await saveProductionForItem({ item, body: row, user: req.user }));
     }
 
     const orderStatus = await updateOrderProductionStatus({ orderId, user: req.user });
-    return successResponse(res, { code: 1002, httpStatus: 200, data: { order_id: orderId, order_status: orderStatus, items: savedItems }, message: "Production updated successfully" });
+    return successResponse(res, { code: 1002, httpStatus: 200, data: { production_note_id: orderId, production_note_status: orderStatus, items: savedItems }, message: "Production updated successfully" });
   } catch (error) {
     const isValidation = /cannot be greater/i.test(error.message);
     return failureResponse(res, { code: 2008, httpStatus: isValidation ? 400 : 500, message: error.message });

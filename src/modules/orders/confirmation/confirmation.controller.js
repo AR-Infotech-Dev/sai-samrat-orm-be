@@ -7,8 +7,8 @@ import { renderTemplate } from "#shared/utils/templateMaker.js";
 // import { isSuperAdminRole as isSuperAdmin } from "#shared/utils/role.utils.js";
 import { env } from "#config/env.js";
 
-const MODULE_TABLE = "orders";
-const ORDERS_LINE_TABLE = "order_items";
+const MODULE_TABLE = "production_notes";
+const ORDERS_LINE_TABLE = "production_note_items";
 const default_columns = {};
 const custom_columns = {
   customer_id: {
@@ -18,12 +18,12 @@ const custom_columns = {
     key2: "customer_id",
     select: "cu.mobile_no AS customer_mobile, cu.email AS customer_email",
   },
-  order_status: {
+  production_note_status: {
     table: "categories",
     alias: "ct",
     column: "categoryName",
     key2: "slug",
-    select: "ct.cat_color as order_status_color",
+    select: "ct.cat_color as production_note_status_color",
   },
   priority: {
     table: "categories",
@@ -107,8 +107,8 @@ const getOrderItems = async (orderId) => {
     `SELECT oi.*, p.product_code, p.product_name, p.brand, p.unit, p.standard_rate, p.gst_rate, p.weight
      FROM ${DB_PREFIX}${ORDERS_LINE_TABLE} oi
      LEFT JOIN ${DB_PREFIX}products p ON oi.product_id = p.product_id
-     WHERE oi.order_id = ? AND oi.status <> 'delete'
-     ORDER BY oi.order_item_id ASC`,
+     WHERE oi.production_note_id = ? AND oi.status <> 'delete'
+     ORDER BY oi.production_note_item_id ASC`,
     [orderId]
   );
 };
@@ -176,7 +176,7 @@ const getProformaInvoiceData = async (orderId) => {
             cu.gst_number AS customer_gst_number
      FROM ${DB_PREFIX}${MODULE_TABLE} o
      LEFT JOIN ${DB_PREFIX}customer cu ON o.customer_id = cu.customer_id
-     WHERE o.order_id = ? AND o.status <> 'delete'
+     WHERE o.production_note_id = ? AND o.status <> 'delete'
      LIMIT 1`,
     [orderId]
   );
@@ -187,8 +187,8 @@ const getProformaInvoiceData = async (orderId) => {
   const items = await getOrderItems(orderId);
   const company = await getCompanyDetails(order.company_id);
   const currency = order.currency || "INR";
-  const totalQty = items.reduce((total, item) => total + toNumber(item.order_qty), 0);
-  const totalWeight = items.reduce((total, item) => total + (toNumber(item.order_qty) * toNumber(item.weight)), 0);
+  const totalQty = items.reduce((total, item) => total + toNumber(item.production_note_qty), 0);
+  const totalWeight = items.reduce((total, item) => total + (toNumber(item.production_note_qty) * toNumber(item.weight)), 0);
   const invoiceTotal = items.reduce((total, item) => total + toNumber(item.line_value), 0);
   const customerName = valueOrDash(order.customer_company_name, order.customer_name);
   const customerAddress = valueOrDash(order.customer_address);
@@ -196,8 +196,8 @@ const getProformaInvoiceData = async (orderId) => {
   return {
     exporter: buildExporter(company),
     invoice: {
-      pi_no: `PI/${order.order_no || order.order_id}`,
-      pi_date: formatDate(order.order_date || order.created_date),
+      pi_no: `PI/${order.production_note_no || order.production_note_id}`,
+      pi_date: formatDate(order.production_note_date || order.created_date),
       currency,
       currency_symbol: getCurrencySymbol(currency),
       remarks: valueOrDash(order.remarks),
@@ -249,7 +249,7 @@ const getProformaInvoiceData = async (orderId) => {
       marking: valueOrDash(item.product_name_snapshot, item.product_name),
       hsn_code: valueOrDash(item.hsn_code, "85072000"),
       weight: formatNumber(item.weight),
-      qty: formatNumber(item.order_qty),
+      qty: formatNumber(item.production_note_qty),
       unit: valueOrDash(item.unit, "Nos"),
       rate: formatNumber(item.unit_rate, 2),
       line_value: formatNumber(item.line_value, 2),
@@ -299,13 +299,13 @@ const updateOrderStatus = async ({ req, res, action, ids, remarks }) => {
     });
   }
 
-  const where = { order_id: orderIds[0] };
-  const existingOrders = await CommonModel.getMasterDetails(MODULE_TABLE, "order_id, order_status, remarks", where);
+  const where = { production_note_id: orderIds[0] };
+  const existingOrders = await CommonModel.getMasterDetails(MODULE_TABLE, "production_note_id, production_note_status, remarks", where);
   if (!existingOrders.length) {
     return failureResponse(res, { code: 2004, httpStatus: 404 });
   }
 
-  const invalidOrder = existingOrders.find((order) => !allowedConfirmationStatuses.includes(order.order_status));
+  const invalidOrder = existingOrders.find((order) => !allowedConfirmationStatuses.includes(order.production_note_status));
   if (invalidOrder) {
     return failureResponse(res, {
       code: 2001,
@@ -316,7 +316,7 @@ const updateOrderStatus = async ({ req, res, action, ids, remarks }) => {
 
   for (const order of existingOrders) {
     const data = {
-      order_status: actionConfig.nextStatus,
+      production_note_status: actionConfig.nextStatus,
       remarks: buildActionRemarks({
         currentRemarks: order.remarks,
         nextStatus: actionConfig.nextStatus,
@@ -326,7 +326,7 @@ const updateOrderStatus = async ({ req, res, action, ids, remarks }) => {
       modified_date: toMysqlDateTime(),
     };
 
-    const updateWhere = { order_id: order.order_id };
+    const updateWhere = { production_note_id: order.production_note_id };
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   updateWhere.company_id = req.user.company_id;
     // }
@@ -337,7 +337,7 @@ const updateOrderStatus = async ({ req, res, action, ids, remarks }) => {
   return successResponse(res, {
     code: 1002,
     httpStatus: 200,
-    data: { ids: existingOrders.map((order) => order.order_id), order_status: actionConfig.nextStatus },
+    data: { ids: existingOrders.map((order) => order.production_note_id), production_note_status: actionConfig.nextStatus },
     message: actionConfig.message,
   });
 };
@@ -355,7 +355,7 @@ export const list = async (req, res) => {
       other: {
         orderBy,
         order,
-        searchColumns: ["order_no"],
+        searchColumns: ["production_note_no"],
       },
       default_columns,
       custom_columns,
@@ -365,14 +365,14 @@ export const list = async (req, res) => {
     where.push("t.status <> 'delete'");
 
     // if (status && status !== "all") {
-    //   where.push("t.order_status = ?");
+    //   where.push("t.production_note_status = ?");
     //   values.push(status);
     // } else {
     // }
-    where.push("t.order_status IN ('waiting','hold')");
+    where.push("t.production_note_status IN ('waiting','hold')");
 
     other.freeTextSearch = searchText;
-    other.searchColumns = ["t.order_no","t.order_code", "t.brand", "cu.name", "cu.mobile_no"];
+    other.searchColumns = ["t.production_note_no","t.production_code", "t.brand", "cu.name", "cu.mobile_no"];
 
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.push("t.company_id = ?");
@@ -411,12 +411,12 @@ export const list = async (req, res) => {
 
 export const getDetails = async (req, res) => {
   try {
-    const { id: order_id = null } = req.params;
-    if (!order_id) {
+    const { id: production_note_id = null } = req.params;
+    if (!production_note_id) {
       return failureResponse(res, { code: 2004, httpStatus: 404 });
     }
 
-    const where = { order_id };
+    const where = { production_note_id };
     // if (!isSuperAdmin(req.user) && req.user.company_id) {
     //   where.company_id = req.user.company_id;
     // }
@@ -429,7 +429,7 @@ export const getDetails = async (req, res) => {
       select: "t.*, cu.name as customer_name, cu.email, cu.email as customer_email, cu.mobile_no as customer_mobile, cu.address as customer_address",
       table: MODULE_TABLE,
       where: [
-        `order_id = ${order_id}`
+        `production_note_id = ${production_note_id}`
       ],
       values: [],
       limit: 1,
@@ -446,7 +446,7 @@ export const getDetails = async (req, res) => {
         //   type: 'LEFT JOIN',
         //   table: 'categories',
         //   alias: 'ct',
-        //   key1: 'order_status',
+        //   key1: 'production_note_status',
         //   key2: 'slug',
         //   column: 'categoryName'
         // },
@@ -488,7 +488,7 @@ export const getDetails = async (req, res) => {
     if (!orderDetails.length || orderDetails[0].status === "delete") {
       return failureResponse(res, { code: 2004, httpStatus: 404 });
     }
-    const items = await getOrderItems(order_id);
+    const items = await getOrderItems(production_note_id);
     return successResponse(res, {
       code: 1004,
       httpStatus: 200,

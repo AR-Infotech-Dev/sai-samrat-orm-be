@@ -26,5 +26,6 @@ router.use('/customers',verifyToken, customerRoutes);
 router.use('/products',verifyToken, productRoutes);
 router.use('/permissions',verifyToken, moduleAccessRoutes);
 router.use('/orders',verifyToken, ordersRoutes);
+router.use('/production-notes',verifyToken, ordersRoutes);
 
 export default router;
